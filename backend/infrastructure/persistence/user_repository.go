@@ -2,8 +2,10 @@ package persistence
 
 import (
 	"database/sql"
+	"errors"
 
 	"github.com/hinata2398/my-video-app/backend/domain/entity"
+	"github.com/lib/pq"
 )
 
 type UserRepository struct {
@@ -21,7 +23,14 @@ func (r *UserRepository) Create(email, passwordHash string) (*entity.User, error
 		 RETURNING id, email, password_hash, created_at`,
 		email, passwordHash,
 	).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.CreatedAt)
-	return user, err
+	if err != nil {
+		var pqErr *pq.Error
+		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
+			return nil, errors.New("このメールアドレスはすでに登録されています")
+		}
+		return nil, err
+	}
+	return user, nil
 }
 
 func (r *UserRepository) FindByEmail(email string) (*entity.User, error) {
