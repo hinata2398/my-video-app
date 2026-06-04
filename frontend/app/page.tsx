@@ -9,12 +9,15 @@ type Video = {
 };
 
 async function getVideos(): Promise<Video[]> {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos`, {
-    cache: "no-store",
-  });
-  if (!res.ok) return [];
-  const data = await res.json();
-  return data ?? [];
+  try {
+    const url = process.env.INTERNAL_API_URL ?? process.env.NEXT_PUBLIC_API_URL;
+    const res = await fetch(`${url}/api/videos`, { cache: "no-store" });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
 }
 
 export default async function Home() {
@@ -29,7 +32,13 @@ export default async function Home() {
         </Link>
       </div>
       {videos.length === 0 ? (
-        <p style={{ color: "#888" }}>まだ動画がありません。</p>
+        <div style={{ textAlign: "center", padding: "4rem 0", color: "#888" }}>
+          <div style={{ fontSize: "4rem", marginBottom: "1rem" }}>▶</div>
+          <p style={{ fontSize: "1.1rem", margin: "0 0 1rem" }}>まだ動画がありません</p>
+          <Link href="/videos/new" style={{ color: "#e00", textDecoration: "none" }}>
+            最初の動画を投稿する →
+          </Link>
+        </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "1.5rem" }}>
           {videos.map((video) => (

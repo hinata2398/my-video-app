@@ -10,11 +10,14 @@ type Video = {
 };
 
 async function getVideo(id: string): Promise<Video | null> {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos/${id}`, {
-    cache: "no-store",
-  });
-  if (!res.ok) return null;
-  return res.json();
+  try {
+    const url = process.env.INTERNAL_API_URL ?? process.env.NEXT_PUBLIC_API_URL;
+    const res = await fetch(`${url}/api/videos/${id}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
 }
 
 export default async function VideoDetailPage({ params }: { params: { id: string } }) {
