@@ -11,9 +11,8 @@ import (
 )
 
 type TranscodeJob struct {
-	VideoID    int64
-	VideoURL   string // MinIO内部URL
-	ObjectName string // 保存先オブジェクト名
+	VideoID  int64
+	VideoURL string // MinIO内部URL（http://minio:9000/...）
 }
 
 type TranscodeQueue struct {
@@ -24,23 +23,20 @@ type TranscodeQueue struct {
 
 func NewTranscodeQueue(minio *storage.MinioClient, db *sql.DB, workers int) *TranscodeQueue {
 	q := &TranscodeQueue{
-		jobs:  make(chan TranscodeJob, 100), // バッファ100件
+		jobs:  make(chan TranscodeJob, 100),
 		minio: minio,
 		db:    db,
 	}
-	// workerをgoroutineで起動
 	for i := 0; i < workers; i++ {
 		go q.worker(i)
 	}
 	return q
 }
 
-// Enqueue はジョブをキューに追加して即座に返る
 func (q *TranscodeQueue) Enqueue(job TranscodeJob) {
 	q.jobs <- job
 }
 
-// worker はキューからジョブを取り出して処理するgoroutine
 func (q *TranscodeQueue) worker(id int) {
 	log.Printf("transcode worker %d started", id)
 	for job := range q.jobs {
@@ -50,25 +46,24 @@ func (q *TranscodeQueue) worker(id int) {
 
 func (q *TranscodeQueue) process(job TranscodeJob) {
 	log.Printf("transcode start: video_id=%d", job.VideoID)
-
-	// ステータスを processing に更新
 	q.updateStatus(job.VideoID, "processing", "")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
-	// トランスコード実行
-	transcodedURL, err := q.minio.Transcode(ctx, job.VideoURL, job.ObjectName)
+	// 1. HLS変換（.m3u8 + .tsセグメント）
+	hlsPrefix := fmt.Sprintf("hls/%d/%d", job.VideoID, time.Now().Unix())
+	hlsURL, err := q.minio.GenerateHLS(ctx, job.VideoURL, hlsPrefix)
 	if err != nil {
-		log.Printf("transcode failed: video_id=%d, err=%v", job.VideoID, err)
+		log.Printf("HLS failed: video_id=%d, err=%v", job.VideoID, err)
 		q.updateStatus(job.VideoID, "error", err.Error())
 		return
 	}
 
-	// video_url を変換済みに更新
+	// video_url をHLSプレイリストのURLに更新
 	_, err = q.db.Exec(
 		`UPDATE videos SET video_url = $1, updated_at = NOW() WHERE id = $2`,
-		transcodedURL, job.VideoID,
+		hlsURL, job.VideoID,
 	)
 	if err != nil {
 		log.Printf("db update failed: video_id=%d, err=%v", job.VideoID, err)
@@ -76,12 +71,11 @@ func (q *TranscodeQueue) process(job TranscodeJob) {
 		return
 	}
 
-	// サムネイル自動生成
+	// 2. サムネイル自動生成（thumbnail_urlが空の場合のみ）
 	thumbObjectName := fmt.Sprintf("thumbnails/%d/%d_auto.jpg", job.VideoID, time.Now().Unix())
 	thumbnailURL, err := q.minio.GenerateThumbnail(ctx, job.VideoURL, thumbObjectName)
 	if err != nil {
 		log.Printf("thumbnail failed (non-fatal): video_id=%d, err=%v", job.VideoID, err)
-		// サムネイル失敗はdoneにする（動画再生には影響しない）
 	} else {
 		q.db.Exec(
 			`UPDATE videos SET thumbnail_url = $1, updated_at = NOW() WHERE id = $2 AND thumbnail_url = ''`,
@@ -90,7 +84,7 @@ func (q *TranscodeQueue) process(job TranscodeJob) {
 	}
 
 	q.updateStatus(job.VideoID, "done", "")
-	log.Printf("transcode done: video_id=%d url=%s", job.VideoID, transcodedURL)
+	log.Printf("transcode done: video_id=%d hls=%s", job.VideoID, hlsURL)
 }
 
 func (q *TranscodeQueue) updateStatus(videoID int64, status, errMsg string) {

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/hinata2398/my-video-app/backend/infrastructure/middleware"
@@ -47,12 +46,10 @@ func (h *TranscodeHandler) Enqueue(w http.ResponseWriter, r *http.Request) {
 
 	// MinIO内部URLに変換
 	internalURL := fmt.Sprintf("http://minio:9000/%s", extractPath(videoURL))
-	objectName := fmt.Sprintf("videos/%d/%d_transcoded.mp4", videoID, time.Now().Unix())
 
 	h.queue.Enqueue(queue.TranscodeJob{
-		VideoID:    videoID,
-		VideoURL:   internalURL,
-		ObjectName: objectName,
+		VideoID:  videoID,
+		VideoURL: internalURL,
 	})
 
 	// ステータスをpendingに更新

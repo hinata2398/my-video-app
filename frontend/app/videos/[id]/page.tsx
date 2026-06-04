@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import HlsPlayer from "../../components/HlsPlayer";
 
 type Video = {
   id: number;
@@ -80,9 +81,7 @@ export default function VideoDetailPage() {
 
       <div style={{ marginTop: "1rem", borderRadius: 8, overflow: "hidden", background: "#111" }}>
         {video.video_url && !isProcessing ? (
-          <video controls style={{ width: "100%", maxHeight: 450, display: "block" }} poster={video.thumbnail_url || undefined}>
-            <source src={video.video_url} type="video/mp4" />
-          </video>
+          <HlsPlayer src={video.video_url} poster={video.thumbnail_url || undefined} />
         ) : video.thumbnail_url ? (
           <img src={video.thumbnail_url} alt={video.title} style={{ width: "100%", maxHeight: 450, objectFit: "cover", display: "block" }} />
         ) : (
