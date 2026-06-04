@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -44,8 +43,6 @@ func (h *UploadHandler) PresignedURL(w http.ResponseWriter, r *http.Request) {
 
 func (h *UploadHandler) PresignedThumbnailURL(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(middleware.UserIDKey).(int64)
-	_ = strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-
 	objectName := fmt.Sprintf("thumbnails/%d/%d.jpg", userID, time.Now().Unix())
 
 	url, err := h.minio.PresignedUploadURL(r.Context(), objectName)

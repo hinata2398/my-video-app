@@ -64,11 +64,14 @@ func NewMinioClient() (*MinioClient, error) {
 }
 
 func (m *MinioClient) PresignedUploadURL(ctx context.Context, objectName string) (string, error) {
-	url, err := m.client.PresignedPutObject(ctx, m.bucket, objectName, 15*time.Minute)
+	u, err := m.client.PresignedPutObject(ctx, m.bucket, objectName, 15*time.Minute)
 	if err != nil {
 		return "", err
 	}
-	return url.String(), nil
+	// Docker内部ホスト(minio:9000)をブラウザからアクセス可能なホスト(localhost:9000)に置換
+	u.Host = m.publicEndpoint
+	u.Scheme = "http"
+	return u.String(), nil
 }
 
 func (m *MinioClient) PublicURL(objectName string) string {
