@@ -11,8 +11,8 @@ import (
 )
 
 type MinioClient struct {
-	client    *minio.Client
-	bucket    string
+	client         *minio.Client
+	bucket         string
 	publicEndpoint string
 }
 
@@ -31,7 +31,6 @@ func NewMinioClient() (*MinioClient, error) {
 		return nil, err
 	}
 
-	// バケットがなければ作成
 	ctx := context.Background()
 	exists, err := client.BucketExists(ctx, bucket)
 	if err != nil {
@@ -47,7 +46,7 @@ func NewMinioClient() (*MinioClient, error) {
 			"Statement":[{
 				"Effect":"Allow",
 				"Principal":"*",
-				"Action":["s3:GetObject"],
+				"Action":["s3:GetObject","s3:PutObject"],
 				"Resource":["arn:aws:s3:::%s/*"]
 			}]
 		}`, bucket)
