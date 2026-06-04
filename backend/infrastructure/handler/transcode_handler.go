@@ -4,26 +4,26 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/hinata2398/my-video-app/backend/infrastructure/middleware"
-	"github.com/hinata2398/my-video-app/backend/infrastructure/storage"
+	"github.com/hinata2398/my-video-app/backend/infrastructure/queue"
 )
 
 type TranscodeHandler struct {
-	minio *storage.MinioClient
+	queue *queue.TranscodeQueue
 	db    *sql.DB
 }
 
-func NewTranscodeHandler(minio *storage.MinioClient, db *sql.DB) *TranscodeHandler {
-	return &TranscodeHandler{minio: minio, db: db}
+func NewTranscodeHandler(q *queue.TranscodeQueue, db *sql.DB) *TranscodeHandler {
+	return &TranscodeHandler{queue: q, db: db}
 }
 
-func (h *TranscodeHandler) Transcode(w http.ResponseWriter, r *http.Request) {
+// Enqueue は動画をキューに追加して即座に202を返す
+func (h *TranscodeHandler) Enqueue(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(middleware.UserIDKey).(int64)
 	videoID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
@@ -31,51 +31,64 @@ func (h *TranscodeHandler) Transcode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 元動画URLをDBから取得（自分の動画のみ）
-	var originalURL string
+	var videoURL string
 	err = h.db.QueryRowContext(r.Context(),
 		`SELECT video_url FROM videos WHERE id = $1 AND user_id = $2`,
 		videoID, userID,
-	).Scan(&originalURL)
+	).Scan(&videoURL)
 	if err != nil {
 		http.Error(w, "動画が見つかりません", http.StatusNotFound)
 		return
 	}
-	if originalURL == "" {
+	if videoURL == "" {
 		http.Error(w, "動画ファイルがアップロードされていません", http.StatusBadRequest)
 		return
 	}
 
-	// FFmpegにはMinIO内部アドレスを渡す
-	internalURL := fmt.Sprintf("http://minio:9000/%s", extractPath(originalURL))
+	// MinIO内部URLに変換
+	internalURL := fmt.Sprintf("http://minio:9000/%s", extractPath(videoURL))
 	objectName := fmt.Sprintf("videos/%d/%d_transcoded.mp4", videoID, time.Now().Unix())
 
-	log.Printf("transcoding video %d: %s", videoID, internalURL)
+	h.queue.Enqueue(queue.TranscodeJob{
+		VideoID:    videoID,
+		VideoURL:   internalURL,
+		ObjectName: objectName,
+	})
 
-	transcodedURL, err := h.minio.Transcode(r.Context(), internalURL, objectName)
-	if err != nil {
-		log.Printf("transcode error video %d: %v", videoID, err)
-		http.Error(w, "トランスコードに失敗しました", http.StatusInternalServerError)
-		return
-	}
-
-	// video_url を変換済みファイルに更新
-	_, err = h.db.ExecContext(r.Context(),
-		`UPDATE videos SET video_url = $1, updated_at = NOW() WHERE id = $2`,
-		transcodedURL, videoID,
+	// ステータスをpendingに更新
+	h.db.ExecContext(r.Context(),
+		`UPDATE videos SET status = 'pending', updated_at = NOW() WHERE id = $1`,
+		videoID,
 	)
-	if err != nil {
-		http.Error(w, "DB更新に失敗しました", http.StatusInternalServerError)
-		return
-	}
-
-	log.Printf("transcoding done video %d: %s", videoID, transcodedURL)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"video_url": transcodedURL})
+	w.WriteHeader(http.StatusAccepted)
+	json.NewEncoder(w).Encode(map[string]string{"status": "pending"})
 }
 
-// "http://localhost:9000/videos/foo/bar.mp4" → "videos/foo/bar.mp4"
+// Status はトランスコードのステータスを返す（フロントエンドがポーリングする）
+func (h *TranscodeHandler) Status(w http.ResponseWriter, r *http.Request) {
+	videoID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	var status, message string
+	err = h.db.QueryRowContext(r.Context(),
+		`SELECT status, status_message FROM videos WHERE id = $1`,
+		videoID,
+	).Scan(&status, &message)
+	if err != nil {
+		http.Error(w, "動画が見つかりません", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": status, "message": message})
+}
+
+// extractPath は "http://localhost:9000/videos/foo/bar.mp4" → "videos/foo/bar.mp4"
 func extractPath(publicURL string) string {
 	const prefix = "http://localhost:9000/"
 	if len(publicURL) > len(prefix) {

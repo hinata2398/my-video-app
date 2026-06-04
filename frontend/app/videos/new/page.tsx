@@ -80,24 +80,16 @@ export default function NewVideoPage() {
         });
       }
 
-      // 5. 動画あり → トランスコード（H.264変換 + faststart）
+      // 5. 動画あり → トランスコードをキューに投げる（即座に返る）
       if (videoUrl) {
-        setProgress("動画を変換中（しばらくお待ちください）...");
+        setProgress("動画変換をキューに登録中...");
         await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos/${video.id}/transcode`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
         });
       }
 
-      // 6. サムネイル未指定 かつ 動画あり → 自動生成
-      if (!thumbnailFile && videoUrl) {
-        setProgress("サムネイルを自動生成中...");
-        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos/${video.id}/generate-thumbnail`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-        });
-      }
-
+      // 即座に詳細ページへ遷移（変換はバックグラウンドで継続）
       router.push(`/videos/${video.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "エラーが発生しました");

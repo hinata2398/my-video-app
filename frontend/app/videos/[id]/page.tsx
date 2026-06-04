@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 
@@ -11,6 +11,7 @@ type Video = {
   description: string;
   thumbnail_url: string;
   video_url: string;
+  status: string;
   created_at: string;
 };
 
@@ -19,14 +20,30 @@ export default function VideoDetailPage() {
   const [video, setVideo] = useState<Video | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
+  const fetchVideo = () => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos/${id}`)
       .then((res) => { if (!res.ok) { setNotFound(true); return null; } return res.json(); })
       .then((data) => { if (data) setVideo(data); })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchVideo();
   }, [id]);
+
+  // status が pending/processing の間はポーリング
+  useEffect(() => {
+    if (!video) return;
+    if (video.status === "pending" || video.status === "processing") {
+      intervalRef.current = setInterval(fetchVideo, 3000);
+    } else {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    }
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [video?.status]);
 
   if (loading) return <main style={{ padding: "2rem" }}><p style={{ color: "#888" }}>読み込み中...</p></main>;
 
@@ -37,12 +54,32 @@ export default function VideoDetailPage() {
     </main>
   );
 
+  const isProcessing = video.status === "pending" || video.status === "processing";
+
   return (
     <main style={{ maxWidth: 800, margin: "0 auto", padding: "2rem" }}>
       <Link href="/" style={{ color: "#888", textDecoration: "none" }}>← 一覧へ戻る</Link>
 
+      {/* ステータスバナー */}
+      {isProcessing && (
+        <div style={{
+          marginTop: "1rem", padding: "0.75rem 1rem", background: "#fff8e1",
+          border: "1px solid #ffe082", borderRadius: 6, color: "#795548",
+        }}>
+          ⏳ 動画を変換中です。しばらくすると再生できるようになります...
+        </div>
+      )}
+      {video.status === "error" && (
+        <div style={{
+          marginTop: "1rem", padding: "0.75rem 1rem", background: "#ffebee",
+          border: "1px solid #ef9a9a", borderRadius: 6, color: "#c62828",
+        }}>
+          ⚠️ 動画の変換に失敗しました
+        </div>
+      )}
+
       <div style={{ marginTop: "1rem", borderRadius: 8, overflow: "hidden", background: "#111" }}>
-        {video.video_url ? (
+        {video.video_url && !isProcessing ? (
           <video controls style={{ width: "100%", maxHeight: 450, display: "block" }} poster={video.thumbnail_url || undefined}>
             <source src={video.video_url} type="video/mp4" />
           </video>

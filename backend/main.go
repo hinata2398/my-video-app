@@ -12,6 +12,7 @@ import (
 	"github.com/hinata2398/my-video-app/backend/infrastructure/handler"
 	authMiddleware "github.com/hinata2398/my-video-app/backend/infrastructure/middleware"
 	"github.com/hinata2398/my-video-app/backend/infrastructure/persistence"
+	"github.com/hinata2398/my-video-app/backend/infrastructure/queue"
 	"github.com/hinata2398/my-video-app/backend/infrastructure/storage"
 	"github.com/hinata2398/my-video-app/backend/usecase"
 	_ "github.com/lib/pq"
@@ -35,7 +36,8 @@ func main() {
 	videoHandler := handler.NewVideoHandler(videoUsecase)
 	uploadHandler := handler.NewUploadHandler(minioClient)
 	thumbnailHandler := handler.NewThumbnailHandler(minioClient, db)
-	transcodeHandler := handler.NewTranscodeHandler(minioClient, db)
+	transcodeQueue := queue.NewTranscodeQueue(minioClient, db, 2) // worker 2本
+	transcodeHandler := handler.NewTranscodeHandler(transcodeQueue, db)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -60,8 +62,10 @@ func main() {
 		r.Get("/api/videos/{id}/upload-url", uploadHandler.PresignedURL)
 		r.Get("/api/videos/{id}/thumbnail-upload-url", uploadHandler.PresignedThumbnailURL)
 		r.Post("/api/videos/{id}/generate-thumbnail", thumbnailHandler.Generate)
-		r.Post("/api/videos/{id}/transcode", transcodeHandler.Transcode)
+		r.Post("/api/videos/{id}/transcode", transcodeHandler.Enqueue)
 	})
+	// ステータス確認は認証不要（一覧ページからも参照できるように）
+	r.Get("/api/videos/{id}/status", transcodeHandler.Status)
 
 	log.Println("Backend running on :8080")
 	if err := http.ListenAndServe(":8080", r); err != nil {
@@ -125,6 +129,8 @@ func migrate(db *sql.DB) {
 		CREATE INDEX IF NOT EXISTS idx_videos_created_at ON videos (created_at DESC);
 		CREATE INDEX IF NOT EXISTS idx_videos_user_id ON videos (user_id);
 		ALTER TABLE videos ADD COLUMN IF NOT EXISTS video_url TEXT NOT NULL DEFAULT '';
+		ALTER TABLE videos ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'done';
+		ALTER TABLE videos ADD COLUMN IF NOT EXISTS status_message TEXT NOT NULL DEFAULT '';
 	`)
 	if err != nil {
 		log.Fatal("Migration failed:", err)

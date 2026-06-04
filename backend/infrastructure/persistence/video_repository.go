@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/hinata2398/my-video-app/backend/domain/entity"
+	"github.com/lib/pq"
 )
 
 type VideoRepository struct {
@@ -15,21 +16,31 @@ func NewVideoRepository(db *sql.DB) *VideoRepository {
 	return &VideoRepository{db: db}
 }
 
+func scanVideo(row interface{ Scan(...interface{}) error }) (*entity.Video, error) {
+	v := &entity.Video{}
+	err := row.Scan(
+		&v.ID, &v.UserID, &v.Title, &v.Description,
+		&v.ThumbnailURL, &v.VideoURL, &v.Status, &v.StatusMessage,
+		&v.CreatedAt, &v.UpdatedAt,
+	)
+	return v, err
+}
+
+const selectFields = `id, user_id, title, description, thumbnail_url, video_url, status, status_message, created_at, updated_at`
+
 func (r *VideoRepository) Create(userID int64, title, description, thumbnailURL string) (*entity.Video, error) {
-	video := &entity.Video{}
-	err := r.db.QueryRow(
+	row := r.db.QueryRow(
 		`INSERT INTO videos (user_id, title, description, thumbnail_url)
 		 VALUES ($1, $2, $3, $4)
-		 RETURNING id, user_id, title, description, thumbnail_url, video_url, created_at, updated_at`,
+		 RETURNING `+selectFields,
 		userID, title, description, thumbnailURL,
-	).Scan(&video.ID, &video.UserID, &video.Title, &video.Description, &video.ThumbnailURL, &video.VideoURL, &video.CreatedAt, &video.UpdatedAt)
-	return video, err
+	)
+	return scanVideo(row)
 }
 
 func (r *VideoRepository) FindByUserID(userID int64) ([]*entity.Video, error) {
 	rows, err := r.db.Query(
-		`SELECT id, user_id, title, description, thumbnail_url, video_url, created_at, updated_at
-		 FROM videos WHERE user_id = $1 ORDER BY created_at DESC`,
+		`SELECT `+selectFields+` FROM videos WHERE user_id = $1 ORDER BY created_at DESC`,
 		userID,
 	)
 	if err != nil {
@@ -39,8 +50,8 @@ func (r *VideoRepository) FindByUserID(userID int64) ([]*entity.Video, error) {
 
 	var videos []*entity.Video
 	for rows.Next() {
-		v := &entity.Video{}
-		if err := rows.Scan(&v.ID, &v.UserID, &v.Title, &v.Description, &v.ThumbnailURL, &v.VideoURL, &v.CreatedAt, &v.UpdatedAt); err != nil {
+		v, err := scanVideo(rows)
+		if err != nil {
 			return nil, err
 		}
 		videos = append(videos, v)
@@ -50,8 +61,7 @@ func (r *VideoRepository) FindByUserID(userID int64) ([]*entity.Video, error) {
 
 func (r *VideoRepository) FindAll() ([]*entity.Video, error) {
 	rows, err := r.db.Query(
-		`SELECT id, user_id, title, description, thumbnail_url, video_url, created_at, updated_at
-		 FROM videos ORDER BY created_at DESC LIMIT 50`,
+		`SELECT ` + selectFields + ` FROM videos ORDER BY created_at DESC LIMIT 50`,
 	)
 	if err != nil {
 		return nil, err
@@ -60,8 +70,8 @@ func (r *VideoRepository) FindAll() ([]*entity.Video, error) {
 
 	var videos []*entity.Video
 	for rows.Next() {
-		v := &entity.Video{}
-		if err := rows.Scan(&v.ID, &v.UserID, &v.Title, &v.Description, &v.ThumbnailURL, &v.VideoURL, &v.CreatedAt, &v.UpdatedAt); err != nil {
+		v, err := scanVideo(rows)
+		if err != nil {
 			return nil, err
 		}
 		videos = append(videos, v)
@@ -70,30 +80,28 @@ func (r *VideoRepository) FindAll() ([]*entity.Video, error) {
 }
 
 func (r *VideoRepository) FindByID(id int64) (*entity.Video, error) {
-	video := &entity.Video{}
-	err := r.db.QueryRow(
-		`SELECT id, user_id, title, description, thumbnail_url, video_url, created_at, updated_at
-		 FROM videos WHERE id = $1`,
-		id,
-	).Scan(&video.ID, &video.UserID, &video.Title, &video.Description, &video.ThumbnailURL, &video.VideoURL, &video.CreatedAt, &video.UpdatedAt)
+	row := r.db.QueryRow(
+		`SELECT `+selectFields+` FROM videos WHERE id = $1`, id,
+	)
+	v, err := scanVideo(row)
 	if err == sql.ErrNoRows {
 		return nil, errors.New("not found")
 	}
-	return video, err
+	return v, err
 }
 
 func (r *VideoRepository) Update(id, userID int64, title, description, thumbnailURL, videoURL string) (*entity.Video, error) {
-	video := &entity.Video{}
-	err := r.db.QueryRow(
+	row := r.db.QueryRow(
 		`UPDATE videos SET title=$1, description=$2, thumbnail_url=$3, video_url=$4, updated_at=NOW()
 		 WHERE id=$5 AND user_id=$6
-		 RETURNING id, user_id, title, description, thumbnail_url, video_url, created_at, updated_at`,
+		 RETURNING `+selectFields,
 		title, description, thumbnailURL, videoURL, id, userID,
-	).Scan(&video.ID, &video.UserID, &video.Title, &video.Description, &video.ThumbnailURL, &video.VideoURL, &video.CreatedAt, &video.UpdatedAt)
+	)
+	v, err := scanVideo(row)
 	if err == sql.ErrNoRows {
 		return nil, errors.New("not found or forbidden")
 	}
-	return video, err
+	return v, err
 }
 
 func (r *VideoRepository) UpdateVideoURL(id int64, videoURL string) error {
@@ -117,3 +125,5 @@ func (r *VideoRepository) Delete(id, userID int64) error {
 	}
 	return nil
 }
+
+var _ *pq.Error // pqを使用
