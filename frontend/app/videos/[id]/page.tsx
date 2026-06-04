@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 
 type Video = {
@@ -9,25 +13,36 @@ type Video = {
   created_at: string;
 };
 
-async function getVideo(id: string): Promise<Video | null> {
-  try {
-    const url = process.env.INTERNAL_API_URL ?? process.env.NEXT_PUBLIC_API_URL;
-    const res = await fetch(`${url}/api/videos/${id}`, { cache: "no-store" });
-    if (!res.ok) return null;
-    return res.json();
-  } catch {
-    return null;
+export default function VideoDetailPage() {
+  const { id } = useParams();
+  const [video, setVideo] = useState<Video | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos/${id}`)
+      .then((res) => {
+        if (!res.ok) { setNotFound(true); return null; }
+        return res.json();
+      })
+      .then((data) => { if (data) setVideo(data); })
+      .catch(() => setNotFound(true))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  if (loading) {
+    return (
+      <main style={{ maxWidth: 800, margin: "0 auto", padding: "2rem", fontFamily: "sans-serif" }}>
+        <p style={{ color: "#888" }}>読み込み中...</p>
+      </main>
+    );
   }
-}
 
-export default async function VideoDetailPage({ params }: { params: { id: string } }) {
-  const video = await getVideo(params.id);
-
-  if (!video) {
+  if (notFound || !video) {
     return (
       <main style={{ maxWidth: 800, margin: "0 auto", padding: "2rem", fontFamily: "sans-serif" }}>
         <p>動画が見つかりません。</p>
-        <Link href="/">← 一覧へ戻る</Link>
+        <Link href="/" style={{ color: "#e00", textDecoration: "none" }}>← 一覧へ戻る</Link>
       </main>
     );
   }

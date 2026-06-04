@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
 type Video = {
@@ -8,20 +11,17 @@ type Video = {
   created_at: string;
 };
 
-async function getVideos(): Promise<Video[]> {
-  try {
-    const url = process.env.INTERNAL_API_URL ?? process.env.NEXT_PUBLIC_API_URL;
-    const res = await fetch(`${url}/api/videos`, { cache: "no-store" });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return Array.isArray(data) ? data : [];
-  } catch {
-    return [];
-  }
-}
+export default function Home() {
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [loading, setLoading] = useState(true);
 
-export default async function Home() {
-  const videos = await getVideos();
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => setVideos(Array.isArray(data) ? data : []))
+      .catch(() => setVideos([]))
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <main style={{ maxWidth: 900, margin: "0 auto", padding: "2rem", fontFamily: "sans-serif" }}>
@@ -31,7 +31,12 @@ export default async function Home() {
           + 投稿する
         </Link>
       </div>
-      {videos.length === 0 ? (
+
+      {loading ? (
+        <div style={{ textAlign: "center", padding: "4rem 0", color: "#888" }}>
+          <p>読み込み中...</p>
+        </div>
+      ) : videos.length === 0 ? (
         <div style={{ textAlign: "center", padding: "4rem 0", color: "#888" }}>
           <div style={{ fontSize: "4rem", marginBottom: "1rem" }}>▶</div>
           <p style={{ fontSize: "1.1rem", margin: "0 0 1rem" }}>まだ動画がありません</p>
