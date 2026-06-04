@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -28,6 +29,7 @@ func (h *UploadHandler) PresignedURL(w http.ResponseWriter, r *http.Request) {
 
 	url, err := h.minio.PresignedUploadURL(r.Context(), objectName)
 	if err != nil {
+		log.Printf("PresignedUploadURL error: %v", err)
 		http.Error(w, "failed to generate upload URL", http.StatusInternalServerError)
 		return
 	}
@@ -47,6 +49,7 @@ func (h *UploadHandler) PresignedThumbnailURL(w http.ResponseWriter, r *http.Req
 
 	url, err := h.minio.PresignedUploadURL(r.Context(), objectName)
 	if err != nil {
+		log.Printf("PresignedUploadURL error: %v", err)
 		http.Error(w, "failed to generate upload URL", http.StatusInternalServerError)
 		return
 	}

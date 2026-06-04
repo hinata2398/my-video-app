@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/minio/minio-go/v7"
@@ -11,12 +12,10 @@ import (
 )
 
 type MinioClient struct {
-	// 内部操作用（バケット管理など）
-	internalClient *minio.Client
-	// 署名付きURL生成用（ブラウザからアクセスできるホスト）
-	publicClient   *minio.Client
+	client         *minio.Client
 	bucket         string
-	publicEndpoint string
+	internalEndpoint string
+	publicEndpoint   string
 }
 
 func NewMinioClient() (*MinioClient, error) {
@@ -26,8 +25,7 @@ func NewMinioClient() (*MinioClient, error) {
 	secretKey := os.Getenv("MINIO_SECRET_KEY")
 	bucket := os.Getenv("MINIO_BUCKET")
 
-	// Dockerネットワーク内部用クライアント
-	internalClient, err := minio.New(internalEndpoint, &minio.Options{
+	client, err := minio.New(internalEndpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
 		Secure: false,
 	})
@@ -35,23 +33,13 @@ func NewMinioClient() (*MinioClient, error) {
 		return nil, err
 	}
 
-	// 署名付きURL生成用クライアント（localhost:9000 で署名）
-	publicClient, err := minio.New(publicEndpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
-		Secure: false,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// バケットがなければ作成
 	ctx := context.Background()
-	exists, err := internalClient.BucketExists(ctx, bucket)
+	exists, err := client.BucketExists(ctx, bucket)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		if err := internalClient.MakeBucket(ctx, bucket, minio.MakeBucketOptions{}); err != nil {
+		if err := client.MakeBucket(ctx, bucket, minio.MakeBucketOptions{}); err != nil {
 			return nil, err
 		}
 		policy := fmt.Sprintf(`{
@@ -63,26 +51,30 @@ func NewMinioClient() (*MinioClient, error) {
 				"Resource":["arn:aws:s3:::%s/*"]
 			}]
 		}`, bucket)
-		if err := internalClient.SetBucketPolicy(ctx, bucket, policy); err != nil {
+		if err := client.SetBucketPolicy(ctx, bucket, policy); err != nil {
 			return nil, err
 		}
 	}
 
 	return &MinioClient{
-		internalClient: internalClient,
-		publicClient:   publicClient,
-		bucket:         bucket,
-		publicEndpoint: publicEndpoint,
+		client:           client,
+		bucket:           bucket,
+		internalEndpoint: internalEndpoint,
+		publicEndpoint:   publicEndpoint,
 	}, nil
 }
 
 func (m *MinioClient) PresignedUploadURL(ctx context.Context, objectName string) (string, error) {
-	// publicClient で署名 → URLのホストが localhost:9000 になる
-	u, err := m.publicClient.PresignedPutObject(ctx, m.bucket, objectName, 15*time.Minute)
+	// 内部クライアントで署名付きURL生成（ネットワーク通信なし）
+	u, err := m.client.PresignedPutObject(ctx, m.bucket, objectName, 15*time.Minute)
 	if err != nil {
 		return "", err
 	}
-	return u.String(), nil
+	// minio:9000 → localhost:9000 に文字列置換
+	// MinIOは受信リクエストのホストではなく認証情報で署名検証するため有効
+	rawURL := u.String()
+	rawURL = strings.Replace(rawURL, m.internalEndpoint, m.publicEndpoint, 1)
+	return rawURL, nil
 }
 
 func (m *MinioClient) PublicURL(objectName string) string {
