@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/hinata2398/my-video-app/backend/infrastructure/handler"
+	authMiddleware "github.com/hinata2398/my-video-app/backend/infrastructure/middleware"
 	"github.com/hinata2398/my-video-app/backend/infrastructure/persistence"
 	"github.com/hinata2398/my-video-app/backend/usecase"
 	_ "github.com/lib/pq"
@@ -23,6 +24,10 @@ func main() {
 	authUsecase := usecase.NewAuthUsecase(userRepo)
 	authHandler := handler.NewAuthHandler(authUsecase)
 
+	videoRepo := persistence.NewVideoRepository(db)
+	videoUsecase := usecase.NewVideoUsecase(videoRepo)
+	videoHandler := handler.NewVideoHandler(videoUsecase)
+
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -31,6 +36,18 @@ func main() {
 	r.Get("/api/health", handler.Health)
 	r.Post("/api/auth/register", authHandler.Register)
 	r.Post("/api/auth/login", authHandler.Login)
+
+	// 動画一覧・詳細は認証不要
+	r.Get("/api/videos", videoHandler.List)
+	r.Get("/api/videos/{id}", videoHandler.Get)
+
+	// 作成・更新・削除は認証必要
+	r.Group(func(r chi.Router) {
+		r.Use(authMiddleware.Auth)
+		r.Post("/api/videos", videoHandler.Create)
+		r.Put("/api/videos/{id}", videoHandler.Update)
+		r.Delete("/api/videos/{id}", videoHandler.Delete)
+	})
 
 	log.Println("Backend running on :8080")
 	if err := http.ListenAndServe(":8080", r); err != nil {
@@ -80,6 +97,18 @@ func migrate(db *sql.DB) {
 			created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		);
 		CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
+
+		CREATE TABLE IF NOT EXISTS videos (
+			id            BIGSERIAL PRIMARY KEY,
+			user_id       BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			title         TEXT NOT NULL,
+			description   TEXT NOT NULL DEFAULT '',
+			thumbnail_url TEXT NOT NULL DEFAULT '',
+			created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+		CREATE INDEX IF NOT EXISTS idx_videos_created_at ON videos (created_at DESC);
+		CREATE INDEX IF NOT EXISTS idx_videos_user_id ON videos (user_id);
 	`)
 	if err != nil {
 		log.Fatal("Migration failed:", err)
