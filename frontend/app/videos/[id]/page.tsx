@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 
 type Video = {
@@ -14,50 +14,19 @@ type Video = {
   created_at: string;
 };
 
-function getMyUserId(): number | null {
-  const token = localStorage.getItem("token");
-  if (!token) return null;
-  try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    return payload.user_id ?? null;
-  } catch {
-    return null;
-  }
-}
-
 export default function VideoDetailPage() {
   const { id } = useParams();
-  const router = useRouter();
   const [video, setVideo] = useState<Video | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [myUserId, setMyUserId] = useState<number | null>(null);
-  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    setMyUserId(getMyUserId());
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos/${id}`)
       .then((res) => { if (!res.ok) { setNotFound(true); return null; } return res.json(); })
       .then((data) => { if (data) setVideo(data); })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
   }, [id]);
-
-  const handleDelete = async () => {
-    if (!confirm("この動画を削除しますか？")) return;
-    setDeleting(true);
-    const token = localStorage.getItem("token");
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos/${id}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.ok) {
-      router.push("/");
-    } else {
-      alert("削除に失敗しました");
-      setDeleting(false);
-    }
-  };
 
   if (loading) return <main style={{ padding: "2rem" }}><p style={{ color: "#888" }}>読み込み中...</p></main>;
 
@@ -67,8 +36,6 @@ export default function VideoDetailPage() {
       <Link href="/" style={{ color: "#e00", textDecoration: "none" }}>← 一覧へ戻る</Link>
     </main>
   );
-
-  const isOwner = myUserId !== null && myUserId === video.user_id;
 
   return (
     <main style={{ maxWidth: 800, margin: "0 auto", padding: "2rem" }}>
@@ -88,30 +55,11 @@ export default function VideoDetailPage() {
         )}
       </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginTop: "1rem" }}>
-        <div>
-          <h1 style={{ margin: "0 0 0.25rem" }}>{video.title}</h1>
-          <p style={{ color: "#888", fontSize: "0.9rem", margin: 0 }}>
-            {new Date(video.created_at).toLocaleDateString("ja-JP")}
-          </p>
-        </div>
-        {isOwner && (
-          <div style={{ display: "flex", gap: "0.5rem", flexShrink: 0 }}>
-            <Link href={`/videos/${video.id}/edit`} style={{
-              padding: "0.4rem 1rem", border: "1px solid #ccc", borderRadius: 4,
-              textDecoration: "none", color: "#333", fontSize: "0.9rem",
-            }}>
-              編集
-            </Link>
-            <button onClick={handleDelete} disabled={deleting} style={{
-              padding: "0.4rem 1rem", background: deleting ? "#ccc" : "#e00",
-              color: "#fff", border: "none", borderRadius: 4,
-              cursor: deleting ? "not-allowed" : "pointer", fontSize: "0.9rem",
-            }}>
-              {deleting ? "削除中..." : "削除"}
-            </button>
-          </div>
-        )}
+      <div style={{ marginTop: "1rem" }}>
+        <h1 style={{ margin: "0 0 0.25rem" }}>{video.title}</h1>
+        <p style={{ color: "#888", fontSize: "0.9rem", margin: 0 }}>
+          {new Date(video.created_at).toLocaleDateString("ja-JP")}
+        </p>
       </div>
 
       {video.description && (

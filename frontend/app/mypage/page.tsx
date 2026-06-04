@@ -7,9 +7,7 @@ import Link from "next/link";
 type Video = {
   id: number;
   title: string;
-  description: string;
   thumbnail_url: string;
-  video_url: string;
   created_at: string;
 };
 
@@ -17,8 +15,9 @@ export default function MyPage() {
   const router = useRouter();
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
-  useEffect(() => {
+  const fetchMyVideos = () => {
     const token = localStorage.getItem("token");
     if (!token) { router.push("/auth"); return; }
 
@@ -29,7 +28,25 @@ export default function MyPage() {
       .then((data) => setVideos(Array.isArray(data) ? data : []))
       .catch(() => setVideos([]))
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { fetchMyVideos(); }, []);
+
+  const handleDelete = async (videoId: number) => {
+    if (!confirm("この動画を削除しますか？")) return;
+    setDeletingId(videoId);
+    const token = localStorage.getItem("token");
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos/${videoId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      setVideos((prev) => prev.filter((v) => v.id !== videoId));
+    } else {
+      alert("削除に失敗しました");
+    }
+    setDeletingId(null);
+  };
 
   return (
     <main style={{ maxWidth: 900, margin: "0 auto", padding: "2rem" }}>
@@ -81,6 +98,18 @@ export default function MyPage() {
                 }}>
                   編集
                 </Link>
+                <button
+                  onClick={() => handleDelete(video.id)}
+                  disabled={deletingId === video.id}
+                  style={{
+                    flex: 1, padding: "0.4rem", border: "none", borderRadius: 4,
+                    background: deletingId === video.id ? "#ccc" : "#e00",
+                    color: "#fff", cursor: deletingId === video.id ? "not-allowed" : "pointer",
+                    fontSize: "0.85rem",
+                  }}
+                >
+                  {deletingId === video.id ? "削除中..." : "削除"}
+                </button>
               </div>
             </div>
           ))}
