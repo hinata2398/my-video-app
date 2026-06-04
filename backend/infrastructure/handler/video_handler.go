@@ -23,6 +23,7 @@ type videoRequest struct {
 	Title        string `json:"title"`
 	Description  string `json:"description"`
 	ThumbnailURL string `json:"thumbnail_url"`
+	VideoURL     string `json:"video_url"`
 }
 
 func (h *VideoHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -82,7 +83,7 @@ func (h *VideoHandler) Update(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
-	video, err := h.videoUsecase.Update(id, userID, req.Title, req.Description, req.ThumbnailURL)
+	video, err := h.videoUsecase.Update(id, userID, req.Title, req.Description, req.ThumbnailURL, req.VideoURL)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusForbidden)
 		return

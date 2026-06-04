@@ -12,6 +12,7 @@ import (
 	"github.com/hinata2398/my-video-app/backend/infrastructure/handler"
 	authMiddleware "github.com/hinata2398/my-video-app/backend/infrastructure/middleware"
 	"github.com/hinata2398/my-video-app/backend/infrastructure/persistence"
+	"github.com/hinata2398/my-video-app/backend/infrastructure/storage"
 	"github.com/hinata2398/my-video-app/backend/usecase"
 	_ "github.com/lib/pq"
 )
@@ -24,9 +25,15 @@ func main() {
 	authUsecase := usecase.NewAuthUsecase(userRepo)
 	authHandler := handler.NewAuthHandler(authUsecase)
 
+	minioClient, minioErr := storage.NewMinioClient()
+	if minioErr != nil {
+		log.Fatal("Could not connect to MinIO:", minioErr)
+	}
+
 	videoRepo := persistence.NewVideoRepository(db)
 	videoUsecase := usecase.NewVideoUsecase(videoRepo)
 	videoHandler := handler.NewVideoHandler(videoUsecase)
+	uploadHandler := handler.NewUploadHandler(minioClient)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -41,12 +48,14 @@ func main() {
 	r.Get("/api/videos", videoHandler.List)
 	r.Get("/api/videos/{id}", videoHandler.Get)
 
-	// 作成・更新・削除は認証必要
+	// 作成・更新・削除・アップロードは認証必要
 	r.Group(func(r chi.Router) {
 		r.Use(authMiddleware.Auth)
 		r.Post("/api/videos", videoHandler.Create)
 		r.Put("/api/videos/{id}", videoHandler.Update)
 		r.Delete("/api/videos/{id}", videoHandler.Delete)
+		r.Get("/api/videos/{id}/upload-url", uploadHandler.PresignedURL)
+		r.Get("/api/videos/{id}/thumbnail-upload-url", uploadHandler.PresignedThumbnailURL)
 	})
 
 	log.Println("Backend running on :8080")
@@ -104,11 +113,13 @@ func migrate(db *sql.DB) {
 			title         TEXT NOT NULL,
 			description   TEXT NOT NULL DEFAULT '',
 			thumbnail_url TEXT NOT NULL DEFAULT '',
+			video_url     TEXT NOT NULL DEFAULT '',
 			created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 			updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		);
 		CREATE INDEX IF NOT EXISTS idx_videos_created_at ON videos (created_at DESC);
 		CREATE INDEX IF NOT EXISTS idx_videos_user_id ON videos (user_id);
+		ALTER TABLE videos ADD COLUMN IF NOT EXISTS video_url TEXT NOT NULL DEFAULT '';
 	`)
 	if err != nil {
 		log.Fatal("Migration failed:", err)

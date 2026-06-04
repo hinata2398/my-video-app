@@ -34,11 +34,11 @@ func (u *VideoUsecase) FindByID(id int64) (*entity.Video, error) {
 	return video, nil
 }
 
-func (u *VideoUsecase) Update(id, userID int64, title, description, thumbnailURL string) (*entity.Video, error) {
+func (u *VideoUsecase) Update(id, userID int64, title, description, thumbnailURL, videoURL string) (*entity.Video, error) {
 	if title == "" {
 		return nil, errors.New("タイトルは必須です")
 	}
-	video, err := u.videoRepo.Update(id, userID, title, description, thumbnailURL)
+	video, err := u.videoRepo.Update(id, userID, title, description, thumbnailURL, videoURL)
 	if err != nil {
 		return nil, errors.New("動画が見つからないか、編集権限がありません")
 	}
