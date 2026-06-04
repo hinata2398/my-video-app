@@ -26,6 +26,20 @@ type videoRequest struct {
 	VideoURL     string `json:"video_url"`
 }
 
+func (h *VideoHandler) MyList(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDKey).(int64)
+	videos, err := h.videoUsecase.FindByUserID(userID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if videos == nil {
+		videos = make([]*entity.Video, 0)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(videos)
+}
+
 func (h *VideoHandler) List(w http.ResponseWriter, r *http.Request) {
 	videos, err := h.videoUsecase.FindAll()
 	if err != nil {

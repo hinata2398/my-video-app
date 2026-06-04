@@ -26,6 +26,28 @@ func (r *VideoRepository) Create(userID int64, title, description, thumbnailURL 
 	return video, err
 }
 
+func (r *VideoRepository) FindByUserID(userID int64) ([]*entity.Video, error) {
+	rows, err := r.db.Query(
+		`SELECT id, user_id, title, description, thumbnail_url, video_url, created_at, updated_at
+		 FROM videos WHERE user_id = $1 ORDER BY created_at DESC`,
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var videos []*entity.Video
+	for rows.Next() {
+		v := &entity.Video{}
+		if err := rows.Scan(&v.ID, &v.UserID, &v.Title, &v.Description, &v.ThumbnailURL, &v.VideoURL, &v.CreatedAt, &v.UpdatedAt); err != nil {
+			return nil, err
+		}
+		videos = append(videos, v)
+	}
+	return videos, nil
+}
+
 func (r *VideoRepository) FindAll() ([]*entity.Video, error) {
 	rows, err := r.db.Query(
 		`SELECT id, user_id, title, description, thumbnail_url, video_url, created_at, updated_at

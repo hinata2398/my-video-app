@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Header from "./components/Header";
 
 export const metadata: Metadata = {
   title: "My Video App",
@@ -12,7 +13,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ja">
-      <body>{children}</body>
+      <body style={{ margin: 0, fontFamily: "sans-serif", background: "#fafafa" }}>
+        <Header />
+        {children}
+      </body>
     </html>
   );
 }

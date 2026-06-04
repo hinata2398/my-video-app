@@ -51,6 +51,7 @@ func main() {
 	// 作成・更新・削除・アップロードは認証必要
 	r.Group(func(r chi.Router) {
 		r.Use(authMiddleware.Auth)
+		r.Get("/api/me/videos", videoHandler.MyList)
 		r.Post("/api/videos", videoHandler.Create)
 		r.Put("/api/videos/{id}", videoHandler.Update)
 		r.Delete("/api/videos/{id}", videoHandler.Delete)

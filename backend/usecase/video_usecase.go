@@ -26,6 +26,10 @@ func (u *VideoUsecase) FindAll() ([]*entity.Video, error) {
 	return u.videoRepo.FindAll()
 }
 
+func (u *VideoUsecase) FindByUserID(userID int64) ([]*entity.Video, error) {
+	return u.videoRepo.FindByUserID(userID)
+}
+
 func (u *VideoUsecase) FindByID(id int64) (*entity.Video, error) {
 	video, err := u.videoRepo.FindByID(id)
 	if err != nil {
