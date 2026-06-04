@@ -80,6 +80,15 @@ export default function NewVideoPage() {
         });
       }
 
+      // 5. サムネイル未指定 かつ 動画あり → 自動生成
+      if (!thumbnailFile && videoUrl) {
+        setProgress("サムネイルを自動生成中...");
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos/${video.id}/generate-thumbnail`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+
       router.push(`/videos/${video.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "エラーが発生しました");

@@ -1,0 +1,83 @@
+package handler
+
+import (
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/hinata2398/my-video-app/backend/infrastructure/middleware"
+	"github.com/hinata2398/my-video-app/backend/infrastructure/storage"
+)
+
+type ThumbnailHandler struct {
+	minio *storage.MinioClient
+	db    *sql.DB
+}
+
+func NewThumbnailHandler(minio *storage.MinioClient, db *sql.DB) *ThumbnailHandler {
+	return &ThumbnailHandler{minio: minio, db: db}
+}
+
+func (h *ThumbnailHandler) Generate(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDKey).(int64)
+	videoID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	// 動画URLをDBから取得（自分の動画のみ）
+	var videoURL string
+	err = h.db.QueryRowContext(r.Context(),
+		`SELECT video_url FROM videos WHERE id = $1 AND user_id = $2`,
+		videoID, userID,
+	).Scan(&videoURL)
+	if err != nil {
+		http.Error(w, "動画が見つかりません", http.StatusNotFound)
+		return
+	}
+	if videoURL == "" {
+		http.Error(w, "動画ファイルがアップロードされていません", http.StatusBadRequest)
+		return
+	}
+
+	// FFmpegに渡すURLはMinIO内部アドレス（バックエンドから直接アクセス）
+	// videoURLはlocalhost:9000なので内部向けに変換
+	internalVideoURL := fmt.Sprintf("http://minio:9000/%s", extractMinioPath(videoURL))
+	objectName := fmt.Sprintf("thumbnails/%d/%d_auto.jpg", videoID, time.Now().Unix())
+
+	thumbnailURL, err := h.minio.GenerateThumbnail(r.Context(), internalVideoURL, objectName)
+	if err != nil {
+		log.Printf("thumbnail generation error: %v", err)
+		http.Error(w, "サムネイル生成に失敗しました", http.StatusInternalServerError)
+		return
+	}
+
+	// DBのthumbnail_urlを更新
+	_, err = h.db.ExecContext(r.Context(),
+		`UPDATE videos SET thumbnail_url = $1, updated_at = NOW() WHERE id = $2`,
+		thumbnailURL, videoID,
+	)
+	if err != nil {
+		http.Error(w, "DB更新に失敗しました", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"thumbnail_url": thumbnailURL})
+}
+
+// "http://localhost:9000/videos/foo/bar.mp4" → "videos/foo/bar.mp4"
+func extractMinioPath(publicURL string) string {
+	// http://localhost:9000/ の後の部分を取得
+	const prefix = "http://localhost:9000/"
+	if len(publicURL) > len(prefix) {
+		return publicURL[len(prefix):]
+	}
+	return publicURL
+}

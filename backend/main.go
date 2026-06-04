@@ -34,6 +34,7 @@ func main() {
 	videoUsecase := usecase.NewVideoUsecase(videoRepo)
 	videoHandler := handler.NewVideoHandler(videoUsecase)
 	uploadHandler := handler.NewUploadHandler(minioClient)
+	thumbnailHandler := handler.NewThumbnailHandler(minioClient, db)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -57,6 +58,7 @@ func main() {
 		r.Delete("/api/videos/{id}", videoHandler.Delete)
 		r.Get("/api/videos/{id}/upload-url", uploadHandler.PresignedURL)
 		r.Get("/api/videos/{id}/thumbnail-upload-url", uploadHandler.PresignedThumbnailURL)
+		r.Post("/api/videos/{id}/generate-thumbnail", thumbnailHandler.Generate)
 	})
 
 	log.Println("Backend running on :8080")
