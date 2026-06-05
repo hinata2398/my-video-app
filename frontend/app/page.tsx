@@ -58,7 +58,7 @@ export default function Home() {
             <Link key={video.id} href={`/videos/${video.id}`} style={{ textDecoration: "none", color: "inherit" }}>
               <div style={{
                 borderRadius: 10, overflow: "hidden", transition: "transform 0.15s, box-shadow 0.15s",
-                cursor: "pointer",
+                cursor: "pointer", border: "1px solid #e5e5e5", background: "#fff",
               }}
                 onMouseEnter={e => {
                   (e.currentTarget as HTMLElement).style.transform = "translateY(-4px)";
