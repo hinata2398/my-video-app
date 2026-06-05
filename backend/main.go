@@ -117,20 +117,19 @@ func migrate(db *sql.DB) {
 		CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
 
 		CREATE TABLE IF NOT EXISTS videos (
-			id            BIGSERIAL PRIMARY KEY,
-			user_id       BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-			title         TEXT NOT NULL,
-			description   TEXT NOT NULL DEFAULT '',
-			thumbnail_url TEXT NOT NULL DEFAULT '',
-			video_url     TEXT NOT NULL DEFAULT '',
-			created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-			updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+			id             BIGSERIAL PRIMARY KEY,
+			user_id        BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			title          TEXT NOT NULL,
+			description    TEXT NOT NULL DEFAULT '',
+			thumbnail_url  TEXT NOT NULL DEFAULT '',
+			video_url      TEXT NOT NULL DEFAULT '',
+			status         TEXT NOT NULL DEFAULT 'done',
+			status_message TEXT NOT NULL DEFAULT '',
+			created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		);
 		CREATE INDEX IF NOT EXISTS idx_videos_created_at ON videos (created_at DESC);
 		CREATE INDEX IF NOT EXISTS idx_videos_user_id ON videos (user_id);
-		ALTER TABLE videos ADD COLUMN IF NOT EXISTS video_url TEXT NOT NULL DEFAULT '';
-		ALTER TABLE videos ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'done';
-		ALTER TABLE videos ADD COLUMN IF NOT EXISTS status_message TEXT NOT NULL DEFAULT '';
 	`)
 	if err != nil {
 		log.Fatal("Migration failed:", err)
