@@ -38,6 +38,9 @@ func main() {
 	thumbnailHandler := handler.NewThumbnailHandler(minioClient, db)
 	transcodeQueue := queue.NewTranscodeQueue(minioClient, db, 2) // worker 2本
 	transcodeHandler := handler.NewTranscodeHandler(transcodeQueue, db)
+	likeRepo := persistence.NewLikeRepository(db)
+	likeUsecase := usecase.NewLikeUsecase(likeRepo)
+	likeHandler := handler.NewLikeHandler(likeUsecase)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -63,9 +66,13 @@ func main() {
 		r.Get("/api/videos/{id}/thumbnail-upload-url", uploadHandler.PresignedThumbnailURL)
 		r.Post("/api/videos/{id}/generate-thumbnail", thumbnailHandler.Generate)
 		r.Post("/api/videos/{id}/transcode", transcodeHandler.Enqueue)
+		r.Post("/api/videos/{id}/like", likeHandler.Toggle)  // ← 追加
 	})
 	// ステータス確認は認証不要（一覧ページからも参照できるように）
 	r.Get("/api/videos/{id}/status", transcodeHandler.Status)
+
+	// いいね数の取得は誰でも見られる（認証不要）
+	r.Get("/api/videos/{id}/likes", likeHandler.Count)
 
 	log.Println("Backend running on :8080")
 	if err := http.ListenAndServe(":8080", r); err != nil {
@@ -130,6 +137,13 @@ func migrate(db *sql.DB) {
 		);
 		CREATE INDEX IF NOT EXISTS idx_videos_created_at ON videos (created_at DESC);
 		CREATE INDEX IF NOT EXISTS idx_videos_user_id ON videos (user_id);
+
+		CREATE TABLE IF NOT EXISTS likes (
+			id         BIGSERIAL PRIMARY KEY,
+			user_id    BIGINT NOT NULL,
+			video_id   BIGINT NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
 	`)
 	if err != nil {
 		log.Fatal("Migration failed:", err)
