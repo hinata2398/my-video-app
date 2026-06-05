@@ -41,7 +41,8 @@ func (h *VideoHandler) MyList(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *VideoHandler) List(w http.ResponseWriter, r *http.Request) {
-	videos, err := h.videoUsecase.FindAll()
+	q := r.URL.Query().Get("q")
+	videos, err := h.videoUsecase.FindAll(q)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

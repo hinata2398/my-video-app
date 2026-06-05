@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 type Video = {
@@ -14,20 +14,71 @@ type Video = {
 export default function Home() {
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos`)
+  const fetchVideos = (q: string) => {
+    setLoading(true);
+    const url = q
+      ? `${process.env.NEXT_PUBLIC_API_URL}/api/videos?q=${encodeURIComponent(q)}`
+      : `${process.env.NEXT_PUBLIC_API_URL}/api/videos`;
+    fetch(url)
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => setVideos(Array.isArray(data) ? data : []))
       .catch(() => setVideos([]))
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { fetchVideos(""); }, []);
+
+  const handleSearch = (value: string) => {
+    setQuery(value);
+    // 300ms デバウンス（入力のたびにAPIを叩かない）
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchVideos(value), 300);
+  };
 
   return (
     <main style={{ maxWidth: 1100, margin: "0 auto", padding: "2rem 1.5rem" }}>
-      <h2 style={{ margin: "0 0 1.5rem", fontSize: "1rem", color: "#555", fontWeight: "normal" }}>
-        最新の動画
-      </h2>
+
+      {/* 検索バー */}
+      <div style={{ marginBottom: "1.5rem", position: "relative" }}>
+        <span style={{
+          position: "absolute", left: "0.85rem", top: "50%", transform: "translateY(-50%)",
+          color: "#aaa", fontSize: "1rem", pointerEvents: "none",
+        }}>🔍</span>
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => handleSearch(e.target.value)}
+          placeholder="動画を検索..."
+          style={{
+            width: "100%", padding: "0.65rem 1rem 0.65rem 2.4rem",
+            fontSize: "0.95rem", border: "1px solid #ddd", borderRadius: 8,
+            outline: "none", boxSizing: "border-box",
+            background: "#fff",
+          }}
+        />
+        {query && (
+          <button
+            onClick={() => handleSearch("")}
+            style={{
+              position: "absolute", right: "0.75rem", top: "50%", transform: "translateY(-50%)",
+              background: "none", border: "none", color: "#aaa", cursor: "pointer",
+              fontSize: "1rem", lineHeight: 1,
+            }}
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
+      {/* 件数 or キーワード表示 */}
+      <p style={{ margin: "0 0 1rem", fontSize: "0.85rem", color: "#888" }}>
+        {query
+          ? `「${query}」の検索結果：${loading ? "..." : `${videos.length} 件`}`
+          : loading ? "" : `${videos.length} 件`}
+      </p>
 
       {loading ? (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "1.5rem" }}>
@@ -43,23 +94,30 @@ export default function Home() {
         </div>
       ) : videos.length === 0 ? (
         <div style={{ textAlign: "center", padding: "5rem 0", color: "#aaa" }}>
-          <div style={{ fontSize: "5rem", marginBottom: "1rem" }}>🎬</div>
-          <p style={{ fontSize: "1.1rem", margin: "0 0 1.5rem" }}>まだ動画がありません</p>
-          <Link href="/videos/new" style={{
-            display: "inline-block", padding: "0.75rem 1.5rem",
-            background: "#e00", color: "#fff", textDecoration: "none", borderRadius: 6,
-          }}>
-            最初の動画を投稿する
-          </Link>
+          <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>
+            {query ? "🔍" : "🎬"}
+          </div>
+          <p style={{ fontSize: "1rem", margin: "0 0 1.5rem" }}>
+            {query ? `「${query}」に一致する動画はありません` : "まだ動画がありません"}
+          </p>
+          {!query && (
+            <Link href="/videos/new" style={{
+              display: "inline-block", padding: "0.75rem 1.5rem",
+              background: "#e00", color: "#fff", textDecoration: "none", borderRadius: 6,
+            }}>
+              最初の動画を投稿する
+            </Link>
+          )}
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "1.5rem" }}>
           {videos.map((video) => (
             <Link key={video.id} href={`/videos/${video.id}`} style={{ textDecoration: "none", color: "inherit" }}>
-              <div style={{
-                borderRadius: 10, overflow: "hidden", transition: "transform 0.15s, box-shadow 0.15s",
-                cursor: "pointer", border: "1px solid #e5e5e5", background: "#fff",
-              }}
+              <div
+                style={{
+                  borderRadius: 10, overflow: "hidden", transition: "transform 0.15s, box-shadow 0.15s",
+                  cursor: "pointer", border: "1px solid #e5e5e5", background: "#fff",
+                }}
                 onMouseEnter={e => {
                   (e.currentTarget as HTMLElement).style.transform = "translateY(-4px)";
                   (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 24px rgba(0,0,0,0.12)";
@@ -69,8 +127,7 @@ export default function Home() {
                   (e.currentTarget as HTMLElement).style.boxShadow = "none";
                 }}
               >
-                {/* サムネイル */}
-                <div style={{ background: "#1a1a1a", height: 165, position: "relative", overflow: "hidden" }}>
+                <div style={{ background: "#1a1a1a", height: 165, overflow: "hidden" }}>
                   {video.thumbnail_url ? (
                     <img src={video.thumbnail_url} alt={video.title}
                       style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -79,19 +136,11 @@ export default function Home() {
                       <span style={{ color: "#444", fontSize: "2.5rem" }}>▶</span>
                     </div>
                   )}
-                  {/* 再生ボタンオーバーレイ */}
-                  <div style={{
-                    position: "absolute", inset: 0, background: "rgba(0,0,0,0)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    transition: "background 0.15s",
-                  }} />
                 </div>
-                {/* 情報 */}
-                <div style={{ padding: "0.75rem 0.5rem 0.5rem" }}>
+                <div style={{ padding: "0.75rem 0.75rem 0.75rem" }}>
                   <p style={{
                     margin: "0 0 0.3rem", fontWeight: 600, fontSize: "0.95rem",
-                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                    color: "#111",
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#111",
                   }}>
                     {video.title}
                   </p>

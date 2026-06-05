@@ -59,10 +59,22 @@ func (r *VideoRepository) FindByUserID(userID int64) ([]*entity.Video, error) {
 	return videos, nil
 }
 
-func (r *VideoRepository) FindAll() ([]*entity.Video, error) {
-	rows, err := r.db.Query(
-		`SELECT `+selectFields+` FROM videos WHERE status = 'done' ORDER BY created_at DESC LIMIT 50`,
-	)
+func (r *VideoRepository) FindAll(query string) ([]*entity.Video, error) {
+	var rows *sql.Rows
+	var err error
+	if query == "" {
+		rows, err = r.db.Query(
+			`SELECT `+selectFields+` FROM videos WHERE status = 'done' ORDER BY created_at DESC LIMIT 50`,
+		)
+	} else {
+		rows, err = r.db.Query(
+			`SELECT `+selectFields+` FROM videos
+			 WHERE status = 'done'
+			   AND (title ILIKE $1 OR description ILIKE $1)
+			 ORDER BY created_at DESC LIMIT 50`,
+			"%"+query+"%",
+		)
+	}
 	if err != nil {
 		return nil, err
 	}

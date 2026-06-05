@@ -22,8 +22,8 @@ func (u *VideoUsecase) Create(userID int64, title, description, thumbnailURL str
 	return u.videoRepo.Create(userID, title, description, thumbnailURL)
 }
 
-func (u *VideoUsecase) FindAll() ([]*entity.Video, error) {
-	return u.videoRepo.FindAll()
+func (u *VideoUsecase) FindAll(query string) ([]*entity.Video, error) {
+	return u.videoRepo.FindAll(query)
 }
 
 func (u *VideoUsecase) FindByUserID(userID int64) ([]*entity.Video, error) {
