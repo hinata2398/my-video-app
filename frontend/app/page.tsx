@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
 type Video = {
@@ -15,10 +15,11 @@ export default function Home() {
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const [appliedQuery, setAppliedQuery] = useState(""); // 実際に検索に使ったキーワード
 
   const fetchVideos = (q: string) => {
     setLoading(true);
+    setAppliedQuery(q);
     const url = q
       ? `${process.env.NEXT_PUBLIC_API_URL}/api/videos?q=${encodeURIComponent(q)}`
       : `${process.env.NEXT_PUBLIC_API_URL}/api/videos`;
@@ -31,52 +32,60 @@ export default function Home() {
 
   useEffect(() => { fetchVideos(""); }, []);
 
-  const handleSearch = (value: string) => {
-    setQuery(value);
-    // 300ms デバウンス（入力のたびにAPIを叩かない）
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => fetchVideos(value), 300);
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    fetchVideos(query);
+  };
+
+  const handleClear = () => {
+    setQuery("");
+    fetchVideos("");
   };
 
   return (
     <main style={{ maxWidth: 1100, margin: "0 auto", padding: "2rem 1.5rem" }}>
 
       {/* 検索バー */}
-      <div style={{ marginBottom: "1.5rem", position: "relative" }}>
-        <span style={{
-          position: "absolute", left: "0.85rem", top: "50%", transform: "translateY(-50%)",
-          color: "#aaa", fontSize: "1rem", pointerEvents: "none",
-        }}>🔍</span>
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => handleSearch(e.target.value)}
-          placeholder="動画を検索..."
-          style={{
-            width: "100%", padding: "0.65rem 1rem 0.65rem 2.4rem",
-            fontSize: "0.95rem", border: "1px solid #ddd", borderRadius: 8,
-            outline: "none", boxSizing: "border-box",
-            background: "#fff",
-          }}
-        />
-        {query && (
-          <button
-            onClick={() => handleSearch("")}
+      <form onSubmit={handleSubmit} style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
+        <div style={{ position: "relative", flex: 1 }}>
+          <span style={{
+            position: "absolute", left: "0.85rem", top: "50%", transform: "translateY(-50%)",
+            color: "#aaa", fontSize: "1rem", pointerEvents: "none",
+          }}>🔍</span>
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="動画を検索..."
             style={{
+              width: "100%", padding: "0.65rem 2.2rem 0.65rem 2.4rem",
+              fontSize: "0.95rem", border: "1px solid #ddd", borderRadius: 8,
+              outline: "none", boxSizing: "border-box", background: "#fff",
+            }}
+          />
+          {query && (
+            <button type="button" onClick={handleClear} style={{
               position: "absolute", right: "0.75rem", top: "50%", transform: "translateY(-50%)",
               background: "none", border: "none", color: "#aaa", cursor: "pointer",
-              fontSize: "1rem", lineHeight: 1,
-            }}
-          >
-            ✕
-          </button>
-        )}
-      </div>
+              fontSize: "1rem", lineHeight: 1, padding: 0,
+            }}>
+              ✕
+            </button>
+          )}
+        </div>
+        <button type="submit" style={{
+          padding: "0 1.25rem", background: "#e00", color: "#fff",
+          border: "none", borderRadius: 8, cursor: "pointer",
+          fontSize: "0.95rem", fontWeight: 600, whiteSpace: "nowrap",
+        }}>
+          検索
+        </button>
+      </form>
 
       {/* 件数 or キーワード表示 */}
       <p style={{ margin: "0 0 1rem", fontSize: "0.85rem", color: "#888" }}>
-        {query
-          ? `「${query}」の検索結果：${loading ? "..." : `${videos.length} 件`}`
+        {appliedQuery
+          ? `「${appliedQuery}」の検索結果：${loading ? "..." : `${videos.length} 件`}`
           : loading ? "" : `${videos.length} 件`}
       </p>
 
@@ -95,12 +104,12 @@ export default function Home() {
       ) : videos.length === 0 ? (
         <div style={{ textAlign: "center", padding: "5rem 0", color: "#aaa" }}>
           <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>
-            {query ? "🔍" : "🎬"}
+            {appliedQuery ? "🔍" : "🎬"}
           </div>
           <p style={{ fontSize: "1rem", margin: "0 0 1.5rem" }}>
-            {query ? `「${query}」に一致する動画はありません` : "まだ動画がありません"}
+            {appliedQuery ? `「${appliedQuery}」に一致する動画はありません` : "まだ動画がありません"}
           </p>
-          {!query && (
+          {!appliedQuery && (
             <Link href="/videos/new" style={{
               display: "inline-block", padding: "0.75rem 1.5rem",
               background: "#e00", color: "#fff", textDecoration: "none", borderRadius: 6,
