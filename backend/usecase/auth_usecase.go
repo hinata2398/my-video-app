@@ -33,10 +33,10 @@ func (u *AuthUsecase) Register(email, password string) (string, error) {
 func (u *AuthUsecase) Login(email, password string) (string, error) {
 	user, err := u.userRepo.FindByEmail(email)
 	if err != nil {
-		return "", errors.New("invalid credentials")
+		return "", errors.New("メールアドレスまたはパスワードが正しくありません")
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
-		return "", errors.New("invalid credentials")
+		return "", errors.New("メールアドレスまたはパスワードが正しくありません")
 	}
 	return generateToken(user.ID)
 }
