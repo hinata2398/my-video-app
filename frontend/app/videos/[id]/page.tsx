@@ -22,31 +22,47 @@ export default function VideoDetailPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const statusRef = useRef<string>("");
 
-  const fetchVideo = () => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos/${id}`)
-      .then((res) => { if (!res.ok) { setNotFound(true); return null; } return res.json(); })
-      .then((data) => { if (data) setVideo(data); })
-      .catch(() => setNotFound(true))
-      .finally(() => setLoading(false));
+  const fetchVideo = async () => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos/${id}`);
+      if (!res.ok) { setNotFound(true); return; }
+      const data: Video = await res.json();
+      setVideo(data);
+      statusRef.current = data.status;
+
+      // done/error になったらポーリング停止
+      if (data.status !== "pending" && data.status !== "processing") {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+      }
+    } catch {
+      setNotFound(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    fetchVideo();
+    fetchVideo().then(() => {
+      // 変換中ならポーリング開始
+      if (statusRef.current === "pending" || statusRef.current === "processing") {
+        intervalRef.current = setInterval(fetchVideo, 3000);
+      }
+    });
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
   }, [id]);
 
-  // status が pending/processing の間はポーリング
-  useEffect(() => {
-    if (!video) return;
-    if (video.status === "pending" || video.status === "processing") {
-      intervalRef.current = setInterval(fetchVideo, 3000);
-    } else {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    }
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [video?.status]);
-
-  if (loading) return <main style={{ padding: "2rem" }}><p style={{ color: "#888" }}>読み込み中...</p></main>;
+  if (loading) return (
+    <main style={{ maxWidth: 800, margin: "0 auto", padding: "2rem" }}>
+      <p style={{ color: "#888" }}>読み込み中...</p>
+    </main>
+  );
 
   if (notFound || !video) return (
     <main style={{ maxWidth: 800, margin: "0 auto", padding: "2rem" }}>
@@ -61,29 +77,35 @@ export default function VideoDetailPage() {
     <main style={{ maxWidth: 800, margin: "0 auto", padding: "2rem" }}>
       <Link href="/" style={{ color: "#888", textDecoration: "none" }}>← 一覧へ戻る</Link>
 
-      {/* ステータスバナー */}
+      {/* 変換中バナー */}
       {isProcessing && (
         <div style={{
-          marginTop: "1rem", padding: "0.75rem 1rem", background: "#fff8e1",
-          border: "1px solid #ffe082", borderRadius: 6, color: "#795548",
+          marginTop: "1rem", padding: "0.75rem 1rem",
+          background: "#fff8e1", border: "1px solid #ffe082",
+          borderRadius: 6, color: "#795548", fontSize: "0.9rem",
         }}>
-          ⏳ 動画を変換中です。しばらくすると再生できるようになります...
+          ⏳ 動画を変換中です。完了すると自動的に再生できるようになります...
         </div>
       )}
       {video.status === "error" && (
         <div style={{
-          marginTop: "1rem", padding: "0.75rem 1rem", background: "#ffebee",
-          border: "1px solid #ef9a9a", borderRadius: 6, color: "#c62828",
+          marginTop: "1rem", padding: "0.75rem 1rem",
+          background: "#ffebee", border: "1px solid #ef9a9a",
+          borderRadius: 6, color: "#c62828", fontSize: "0.9rem",
         }}>
           ⚠️ 動画の変換に失敗しました
         </div>
       )}
 
+      {/* プレイヤーエリア */}
       <div style={{ marginTop: "1rem", borderRadius: 8, overflow: "hidden", background: "#111" }}>
         {video.video_url && !isProcessing ? (
           <HlsPlayer src={video.video_url} poster={video.thumbnail_url || undefined} />
         ) : video.thumbnail_url ? (
-          <img src={video.thumbnail_url} alt={video.title} style={{ width: "100%", maxHeight: 450, objectFit: "cover", display: "block" }} />
+          <img
+            src={video.thumbnail_url} alt={video.title}
+            style={{ width: "100%", maxHeight: 450, objectFit: "cover", display: "block" }}
+          />
         ) : (
           <div style={{ height: 400, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <span style={{ color: "#555", fontSize: "4rem" }}>▶</span>
