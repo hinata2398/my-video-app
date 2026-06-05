@@ -61,7 +61,7 @@ func (r *VideoRepository) FindByUserID(userID int64) ([]*entity.Video, error) {
 
 func (r *VideoRepository) FindAll() ([]*entity.Video, error) {
 	rows, err := r.db.Query(
-		`SELECT ` + selectFields + ` FROM videos ORDER BY created_at DESC LIMIT 50`,
+		`SELECT `+selectFields+` FROM videos WHERE status = 'done' ORDER BY created_at DESC LIMIT 50`,
 	)
 	if err != nil {
 		return nil, err
