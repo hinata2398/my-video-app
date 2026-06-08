@@ -42,6 +42,10 @@ func main() {
 	likeUsecase := usecase.NewLikeUsecase(likeRepo)
 	likeHandler := handler.NewLikeHandler(likeUsecase)
 
+	commentRepo := persistence.NewCommentRepository(db)
+	commentUsecase := usecase.NewCommentUsecase(commentRepo)
+	commentHandler := handler.NewCommentHandler(commentUsecase)
+
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -75,6 +79,10 @@ func main() {
 	r.Get("/api/videos/{id}/likes", likeHandler.Count)
 
 	r.Post("/api/videos/{id}/view", videoHandler.IncrementViewCount)
+
+	// コメント（一覧は認証不要、投稿は認証必要）
+	r.Get("/api/videos/{id}/comments", commentHandler.List)
+	r.With(authMiddleware.Auth).Post("/api/videos/{id}/comments", commentHandler.Create)
 
 	log.Println("Backend running on :8080")
 	if err := http.ListenAndServe(":8080", r); err != nil {

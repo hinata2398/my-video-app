@@ -17,6 +17,14 @@ type Video = {
   created_at: string;
 };
 
+type Comment = {
+  id: number;
+  user_id: number;
+  email: string;
+  body: string;
+  created_at: string;
+};
+
 export default function VideoDetailPage() {
   const { id } = useParams();
   const router = useRouter();
@@ -25,6 +33,8 @@ export default function VideoDetailPage() {
   const [notFound, setNotFound] = useState(false);
   const [likeCount, setLikeCount] = useState(0); // いいね数
   const [liked, setLiked] = useState(false); // 自分がいいね済みか
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [commentBody, setCommentBody] = useState("");
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchVideo = () => {
@@ -85,10 +95,40 @@ export default function VideoDetailPage() {
     setLikeCount(data.count);
   };
 
+  const fetchComments = async () => {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos/${id}/comments`);
+    const data = await res.json();
+    setComments(data);
+  };
+
+  const handleCommentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const token = localStorage.getItem("token");
+    if (!token) {
+      router.push("/auth");
+      return;
+    }
+    if (!commentBody.trim()) return;
+
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos/${id}/comments`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ body: commentBody }),
+    });
+    if (res.ok) {
+      setCommentBody("");
+      fetchComments();
+    }
+  };
+
   // useEffect でページ読み込み時に呼ぶ
   useEffect(() => {
     fetchVideo();
     fetchLikes();
+    fetchComments();
   }, [id]);
 
   // status が pending/processing の間はポーリング
@@ -247,6 +287,79 @@ export default function VideoDetailPage() {
           {video.description}
         </p>
       )}
+
+      {/* コメントセクション */}
+      <div style={{ marginTop: "2rem", borderTop: "1px solid #eee", paddingTop: "1rem" }}>
+        <h2 style={{ fontSize: "1rem", marginBottom: "1rem" }}>コメント {comments.length}件</h2>
+
+        {/* コメント投稿フォーム */}
+        <form onSubmit={handleCommentSubmit} style={{ display: "flex", gap: 8, marginBottom: "1.5rem" }}>
+          <input
+            type="text"
+            value={commentBody}
+            onChange={(e) => setCommentBody(e.target.value)}
+            placeholder="コメントを入力..."
+            style={{
+              flex: 1,
+              padding: "8px 12px",
+              border: "1px solid #ddd",
+              borderRadius: 6,
+              fontSize: "0.9rem",
+            }}
+          />
+          <button
+            type="submit"
+            style={{
+              padding: "8px 16px",
+              background: "#e00",
+              color: "#fff",
+              border: "none",
+              borderRadius: 6,
+              cursor: "pointer",
+              fontSize: "0.9rem",
+            }}
+          >
+            投稿
+          </button>
+        </form>
+
+        {/* コメント一覧 */}
+        {comments.length === 0 ? (
+          <p style={{ color: "#aaa", fontSize: "0.9rem" }}>まだコメントはありません</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {comments.map((comment) => (
+              <div key={comment.id} style={{ display: "flex", gap: 12 }}>
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: "50%",
+                    background: "#ddd",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "0.85rem",
+                    fontWeight: "bold",
+                    flexShrink: 0,
+                  }}
+                >
+                  {comment.email[0].toUpperCase()}
+                </div>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                    <span style={{ fontSize: "0.85rem", fontWeight: "bold" }}>{comment.email}</span>
+                    <span style={{ fontSize: "0.75rem", color: "#aaa" }}>
+                      {new Date(comment.created_at).toLocaleDateString("ja-JP")}
+                    </span>
+                  </div>
+                  <p style={{ margin: 0, fontSize: "0.9rem", lineHeight: 1.6 }}>{comment.body}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </main>
   );
 }
