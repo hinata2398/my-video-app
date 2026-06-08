@@ -74,6 +74,8 @@ func main() {
 	// いいね数の取得は誰でも見られる（認証不要）
 	r.Get("/api/videos/{id}/likes", likeHandler.Count)
 
+	r.Post("/api/videos/{id}/view", videoHandler.IncrementViewCount)
+
 	log.Println("Backend running on :8080")
 	if err := http.ListenAndServe(":8080", r); err != nil {
 		log.Fatal(err)

@@ -21,12 +21,12 @@ func scanVideo(row interface{ Scan(...interface{}) error }) (*entity.Video, erro
 	err := row.Scan(
 		&v.ID, &v.UserID, &v.Title, &v.Description,
 		&v.ThumbnailURL, &v.VideoURL, &v.Status, &v.StatusMessage,
-		&v.CreatedAt, &v.UpdatedAt,
+		&v.ViewCount, &v.CreatedAt, &v.UpdatedAt,
 	)
 	return v, err
 }
 
-const selectFields = `id, user_id, title, description, thumbnail_url, video_url, status, status_message, created_at, updated_at`
+const selectFields = `id, user_id, title, description, thumbnail_url, video_url, status, status_message, view_count, created_at, updated_at`
 
 func (r *VideoRepository) Create(userID int64, title, description, thumbnailURL string) (*entity.Video, error) {
 	row := r.db.QueryRow(
@@ -136,6 +136,14 @@ func (r *VideoRepository) Delete(id, userID int64) error {
 		return errors.New("not found or forbidden")
 	}
 	return nil
+}
+
+func (r *VideoRepository) IncrementViewCount(id int64) error {
+	_, err := r.db.Exec(
+		`UPDATE videos SET view_count = view_count + 1 WHERE id = $1`,
+		id,
+	)
+	return err
 }
 
 var _ *pq.Error // pqを使用

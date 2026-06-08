@@ -55,3 +55,7 @@ func (u *VideoUsecase) Delete(id, userID int64) error {
 	}
 	return nil
 }
+
+func (u *VideoUsecase) IncrementViewCount(id int64) error {
+	return u.videoRepo.IncrementViewCount(id)
+}

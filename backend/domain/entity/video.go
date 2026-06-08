@@ -11,6 +11,7 @@ type Video struct {
 	VideoURL      string    `json:"video_url"`
 	Status        string    `json:"status"`
 	StatusMessage string    `json:"status_message"`
+	ViewCount     int64     `json:"view_count"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 }

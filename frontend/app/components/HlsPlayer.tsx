@@ -6,6 +6,7 @@ import type Hls from "hls.js";
 type Props = {
   src: string;
   poster?: string;
+  onView?: () => void;
 };
 
 type QualityLevel = {
@@ -13,7 +14,7 @@ type QualityLevel = {
   label: string;
 };
 
-export default function HlsPlayer({ src, poster }: Props) {
+export default function HlsPlayer({ src, poster, onView }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const [levels, setLevels] = useState<QualityLevel[]>([]);
@@ -25,6 +26,16 @@ export default function HlsPlayer({ src, poster }: Props) {
     if (!video) return;
 
     let hlsInstance: Hls | null = null;
+
+    // 10秒以上再生したら再生数をカウント
+    let counted = false;
+    const handleTimeUpdate = () => {
+      if (!counted && video.currentTime >= 10) {
+        counted = true;
+        onView?.();
+      }
+    };
+    video.addEventListener("timeupdate", handleTimeUpdate);
 
     import("hls.js").then(({ default: Hls }) => {
       if (Hls.isSupported()) {
@@ -49,6 +60,7 @@ export default function HlsPlayer({ src, poster }: Props) {
 
     return () => {
       hlsInstance?.destroy();
+      video.removeEventListener("timeupdate", handleTimeUpdate);
     };
   }, [src]);
 

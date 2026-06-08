@@ -10,4 +10,5 @@ type VideoRepository interface {
 	Update(id, userID int64, title, description, thumbnailURL, videoURL string) (*entity.Video, error)
 	UpdateVideoURL(id int64, videoURL string) error
 	Delete(id, userID int64) error
+	IncrementViewCount(id int64) error
 }
