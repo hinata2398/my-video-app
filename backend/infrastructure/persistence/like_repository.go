@@ -47,3 +47,39 @@ func (r *LikeRepository) Exists(userID, videoID int64) (bool, error) {
     ).Scan(&exists)
     return exists, err
 }
+
+func (r *LikeRepository) Dislike(userID, videoID int64) error {
+    _, err := r.db.Exec(
+        `INSERT INTO video_dislikes (user_id, video_id) VALUES ($1, $2)`,
+        userID, videoID,
+    )
+    return err
+}
+
+func (r *LikeRepository) Undislike(userID, videoID int64) error {
+    _, err := r.db.Exec(
+        `DELETE FROM video_dislikes WHERE user_id = $1 AND video_id = $2`,
+        userID, videoID,
+    )
+    return err
+}
+
+func (r *LikeRepository) DislikeCount(videoID int64) (int64, error) {
+    var count int64
+    err := r.db.QueryRow(
+        `SELECT COUNT(*) FROM video_dislikes WHERE video_id = $1`,
+        videoID,
+    ).Scan(&count)
+    return count, err
+}
+
+func (r *LikeRepository) DislikeExists(userID, videoID int64) (bool, error) {
+    var exists bool
+    err := r.db.QueryRow(
+        `SELECT EXISTS(
+            SELECT 1 FROM video_dislikes WHERE user_id = $1 AND video_id = $2
+        )`,
+        userID, videoID,
+    ).Scan(&exists)
+    return exists, err
+}

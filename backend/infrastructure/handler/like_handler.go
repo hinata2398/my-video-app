@@ -46,23 +46,79 @@ func (h *LikeHandler) Toggle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *LikeHandler) Count(w http.ResponseWriter, r *http.Request) {
-    // URLの {id} 部分（動画ID）を取り出す
     videoID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
     if err != nil {
         http.Error(w, "invalid id", http.StatusBadRequest)
         return
     }
 
-    // usecaseに丸投げ
     count, err := h.likeUsecase.Count(videoID)
     if err != nil {
         http.Error(w, err.Error(), http.StatusInternalServerError)
         return
     }
 
-    // 結果を返す
     w.Header().Set("Content-Type", "application/json")
     json.NewEncoder(w).Encode(map[string]interface{}{
         "count": count,
+    })
+}
+
+func (h *LikeHandler) ToggleDislike(w http.ResponseWriter, r *http.Request) {
+    userID := r.Context().Value(middleware.UserIDKey).(int64)
+    videoID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+    if err != nil {
+        http.Error(w, "invalid id", http.StatusBadRequest)
+        return
+    }
+
+    disliked, count, err := h.likeUsecase.ToggleDislike(userID, videoID)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]interface{}{
+        "disliked": disliked,
+        "count":    count,
+    })
+}
+
+func (h *LikeHandler) DislikeCount(w http.ResponseWriter, r *http.Request) {
+    videoID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+    if err != nil {
+        http.Error(w, "invalid id", http.StatusBadRequest)
+        return
+    }
+
+    count, err := h.likeUsecase.DislikeCount(videoID)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]interface{}{
+        "count": count,
+    })
+}
+
+// Status はログイン中ユーザーのいいね・よくないね状態を返す
+func (h *LikeHandler) Status(w http.ResponseWriter, r *http.Request) {
+    userID := r.Context().Value(middleware.UserIDKey).(int64)
+    videoID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+    if err != nil {
+        http.Error(w, "invalid id", http.StatusBadRequest)
+        return
+    }
+
+    liked, _ := h.likeUsecase.LikeExists(userID, videoID)
+    disliked, _ := h.likeUsecase.DislikeExists(userID, videoID)
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]interface{}{
+        "liked":    liked,
+        "disliked": disliked,
     })
 }

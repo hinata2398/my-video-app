@@ -43,6 +43,26 @@ func (h *UploadHandler) PresignedURL(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *UploadHandler) PresignedAvatarURL(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDKey).(int64)
+	objectName := fmt.Sprintf("avatars/%d/%d.jpg", userID, time.Now().Unix())
+
+	url, err := h.minio.PresignedUploadURL(r.Context(), objectName)
+	if err != nil {
+		log.Printf("PresignedUploadURL error: %v", err)
+		http.Error(w, "failed to generate upload URL", http.StatusInternalServerError)
+		return
+	}
+
+	publicURL := h.minio.PublicURL(objectName)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"upload_url": url,
+		"avatar_url": publicURL,
+	})
+}
+
 func (h *UploadHandler) PresignedThumbnailURL(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(middleware.UserIDKey).(int64)
 	objectName := fmt.Sprintf("thumbnails/%d/%d.jpg", userID, time.Now().Unix())

@@ -4,17 +4,30 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+type Me = {
+  username: string;
+  avatar_url: string;
+  email: string;
+};
+
 export default function Header() {
   const router = useRouter();
-  const [loggedIn, setLoggedIn] = useState(false);
+  const [me, setMe] = useState<Me | null>(null);
 
   useEffect(() => {
-    setLoggedIn(!!localStorage.getItem("token"));
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (data) setMe(data); })
+      .catch(() => {});
   }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
-    setLoggedIn(false);
+    setMe(null);
     router.push("/");
   };
 
@@ -28,7 +41,7 @@ export default function Header() {
         🎬 MyVideoApp
       </Link>
       <nav style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-        {loggedIn ? (
+        {me ? (
           <>
             <Link href="/mypage" style={{ color: "#ccc", textDecoration: "none", fontSize: "0.9rem" }}>
               マイページ
@@ -38,6 +51,23 @@ export default function Header() {
               padding: "0.4rem 1rem", borderRadius: 4, fontSize: "0.9rem",
             }}>
               + 投稿する
+            </Link>
+            {/* アバター → プロフィール編集へ */}
+            <Link href="/profile" style={{ textDecoration: "none" }}>
+              <div style={{
+                width: 34, height: 34, borderRadius: "50%",
+                background: "#555", overflow: "hidden",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "0.9rem", fontWeight: "bold", color: "#fff",
+                cursor: "pointer", border: "2px solid #777",
+              }}>
+                {me.avatar_url ? (
+                  <img src={me.avatar_url} alt="avatar"
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  (me.username || me.email)[0].toUpperCase()
+                )}
+              </div>
             </Link>
             <button onClick={handleLogout} style={{
               background: "none", border: "1px solid #555", color: "#ccc",

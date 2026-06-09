@@ -20,9 +20,9 @@ func (r *UserRepository) Create(email, passwordHash, username string) (*entity.U
 	user := &entity.User{}
 	err := r.db.QueryRow(
 		`INSERT INTO users (email, password_hash, username) VALUES ($1, $2, $3)
-		 RETURNING id, email, username, password_hash, created_at`,
+		 RETURNING id, email, username, avatar_url, password_hash, created_at`,
 		email, passwordHash, username,
-	).Scan(&user.ID, &user.Email, &user.Username, &user.PasswordHash, &user.CreatedAt)
+	).Scan(&user.ID, &user.Email, &user.Username, &user.AvatarURL, &user.PasswordHash, &user.CreatedAt)
 	if err != nil {
 		var pqErr *pq.Error
 		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
@@ -36,8 +36,25 @@ func (r *UserRepository) Create(email, passwordHash, username string) (*entity.U
 func (r *UserRepository) FindByEmail(email string) (*entity.User, error) {
 	user := &entity.User{}
 	err := r.db.QueryRow(
-		`SELECT id, email, username, password_hash, created_at FROM users WHERE email = $1`,
+		`SELECT id, email, username, avatar_url, password_hash, created_at FROM users WHERE email = $1`,
 		email,
-	).Scan(&user.ID, &user.Email, &user.Username, &user.PasswordHash, &user.CreatedAt)
+	).Scan(&user.ID, &user.Email, &user.Username, &user.AvatarURL, &user.PasswordHash, &user.CreatedAt)
 	return user, err
+}
+
+func (r *UserRepository) FindByID(id int64) (*entity.User, error) {
+	user := &entity.User{}
+	err := r.db.QueryRow(
+		`SELECT id, email, username, avatar_url, password_hash, created_at FROM users WHERE id = $1`,
+		id,
+	).Scan(&user.ID, &user.Email, &user.Username, &user.AvatarURL, &user.PasswordHash, &user.CreatedAt)
+	return user, err
+}
+
+func (r *UserRepository) UpdateProfile(id int64, username, avatarURL string) error {
+	_, err := r.db.Exec(
+		`UPDATE users SET username = $1, avatar_url = $2 WHERE id = $3`,
+		username, avatarURL, id,
+	)
+	return err
 }

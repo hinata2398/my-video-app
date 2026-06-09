@@ -22,8 +22,8 @@ func (u *CommentUsecase) Create(videoID, userID int64, body string) (*entity.Com
 	return u.commentRepo.Create(videoID, userID, body)
 }
 
-func (u *CommentUsecase) FindByVideoID(videoID int64) ([]*entity.Comment, error) {
-	comments, err := u.commentRepo.FindByVideoID(videoID)
+func (u *CommentUsecase) FindByVideoID(videoID, userID int64) ([]*entity.Comment, error) {
+	comments, err := u.commentRepo.FindByVideoID(videoID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -31,4 +31,12 @@ func (u *CommentUsecase) FindByVideoID(videoID int64) ([]*entity.Comment, error)
 		return []*entity.Comment{}, nil
 	}
 	return comments, nil
+}
+
+func (u *CommentUsecase) ToggleLike(commentID, userID int64) (int64, bool, error) {
+	return u.commentRepo.ToggleLike(commentID, userID)
+}
+
+func (u *CommentUsecase) ToggleDislike(commentID, userID int64) (int64, bool, error) {
+	return u.commentRepo.ToggleDislike(commentID, userID)
 }

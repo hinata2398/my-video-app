@@ -22,6 +22,10 @@ type Comment = {
   user_id: number;
   username: string;
   body: string;
+  like_count: number;
+  liked: boolean;
+  dislike_count: number;
+  disliked: boolean;
   created_at: string;
 };
 
@@ -31,8 +35,10 @@ export default function VideoDetailPage() {
   const [video, setVideo] = useState<Video | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [likeCount, setLikeCount] = useState(0); // いいね数
-  const [liked, setLiked] = useState(false); // 自分がいいね済みか
+  const [likeCount, setLikeCount] = useState(0);
+  const [liked, setLiked] = useState(false);
+  const [dislikeCount, setDislikeCount] = useState(0);
+  const [disliked, setDisliked] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentBody, setCommentBody] = useState("");
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -58,18 +64,27 @@ export default function VideoDetailPage() {
     });
   };
   const fetchLikes = async () => {
-    // いいね数を取得（誰でも見られる）
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/videos/${id}/likes`,
-    );
-    const data = await res.json();
-    setLikeCount(data.count);
+    const [likeRes, dislikeRes] = await Promise.all([
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos/${id}/likes`),
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos/${id}/dislikes`),
+    ]);
+    const likeData = await likeRes.json();
+    const dislikeData = await dislikeRes.json();
+    setLikeCount(likeData.count);
+    setDislikeCount(dislikeData.count);
 
-    // 自分がいいね済みか確認（ログイン中のみ）
+    // ログイン中なら自分のいいね・よくないね状態を取得
     const token = localStorage.getItem("token");
     if (token) {
-      // Toggle の代わりに Count エンドポイントは liked を返さないので
-      // ここは liked の取得は省略してもOK（ボタン押した時に更新する）
+      const statusRes = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/videos/${id}/like-status`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (statusRes.ok) {
+        const statusData = await statusRes.json();
+        setLiked(statusData.liked);
+        setDisliked(statusData.disliked);
+      }
     }
   };
 
@@ -90,9 +105,35 @@ export default function VideoDetailPage() {
     );
     const data = await res.json();
 
-    // APIから返ってきた最新の状態で更新
     setLiked(data.liked);
     setLikeCount(data.count);
+    if (data.liked && disliked) {
+      setDisliked(false);
+      setDislikeCount((prev) => Math.max(0, prev - 1));
+    }
+  };
+
+  const handleDislike = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      router.push("/auth");
+      return;
+    }
+
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/videos/${id}/dislike`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+    const data = await res.json();
+    setDisliked(data.disliked);
+    setDislikeCount(data.count);
+    if (data.disliked && liked) {
+      setLiked(false);
+      setLikeCount((prev) => Math.max(0, prev - 1));
+    }
   };
 
   const fetchComments = async () => {
@@ -126,6 +167,68 @@ export default function VideoDetailPage() {
     if (res.ok) {
       setCommentBody("");
       fetchComments();
+    }
+  };
+
+  const handleCommentLike = async (commentId: number) => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      router.push("/auth");
+      return;
+    }
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/comments/${commentId}/like`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+    if (res.ok) {
+      const data = await res.json();
+      setComments((prev) =>
+        prev.map((c) =>
+          c.id === commentId
+            ? {
+                ...c,
+                like_count: data.count,
+                liked: data.liked,
+                dislike_count: data.liked ? Math.max(0, c.dislike_count - 1) : c.dislike_count,
+                disliked: data.liked ? false : c.disliked,
+              }
+            : c,
+        ),
+      );
+    }
+  };
+
+  const handleCommentDislike = async (commentId: number) => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      router.push("/auth");
+      return;
+    }
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/comments/${commentId}/dislike`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+    if (res.ok) {
+      const data = await res.json();
+      setComments((prev) =>
+        prev.map((c) =>
+          c.id === commentId
+            ? {
+                ...c,
+                dislike_count: data.count,
+                disliked: data.disliked,
+                like_count: data.disliked ? Math.max(0, c.like_count - 1) : c.like_count,
+                liked: data.disliked ? false : c.liked,
+              }
+            : c,
+        ),
+      );
     }
   };
 
@@ -259,25 +362,42 @@ export default function VideoDetailPage() {
             {video.view_count}回視聴
           </p>
         </div>
-        <button
-          onClick={handleLike}
-          style={{
-            marginLeft: "auto",
-            padding: "0.5rem 1rem",
-            background: liked ? "#fff0f5" : "#fff",
-            color: liked ? "#d63384" : "#888",
-            border: "1px solid",
-            borderColor: liked ? "#f9a8c9" : "#ddd",
-            borderRadius: 20,
-            cursor: "pointer",
-            fontSize: "0.9rem",
-            display: "flex",
-            alignItems: "center",
-            gap: "0.3rem",
-          }}
-        >
-          ❤️ {likeCount}
-        </button>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          <button
+            onClick={handleLike}
+            style={{
+              background: "none",
+              border: `1px solid ${liked ? "#e00" : "#ddd"}`,
+              borderRadius: 20,
+              cursor: "pointer",
+              color: liked ? "#e00" : "#888",
+              fontSize: "0.9rem",
+              padding: "5px 14px",
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            👍 {likeCount}
+          </button>
+          <button
+            onClick={handleDislike}
+            style={{
+              background: "none",
+              border: `1px solid ${disliked ? "#555" : "#ddd"}`,
+              borderRadius: 20,
+              cursor: "pointer",
+              color: disliked ? "#555" : "#888",
+              fontSize: "0.9rem",
+              padding: "5px 14px",
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            👎 {dislikeCount}
+          </button>
+        </div>
       </div>
 
       {video.description && (
@@ -383,6 +503,42 @@ export default function VideoDetailPage() {
                   <p style={{ margin: 0, fontSize: "0.9rem", lineHeight: 1.6 }}>
                     {comment.body}
                   </p>
+                  <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                    <button
+                      onClick={() => handleCommentLike(comment.id)}
+                      style={{
+                        background: "none",
+                        border: `1px solid ${comment.liked ? "#e00" : "#ddd"}`,
+                        borderRadius: 20,
+                        cursor: "pointer",
+                        color: comment.liked ? "#e00" : "#888",
+                        fontSize: "0.8rem",
+                        padding: "3px 10px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                      }}
+                    >
+                      👍 {comment.like_count}
+                    </button>
+                    <button
+                      onClick={() => handleCommentDislike(comment.id)}
+                      style={{
+                        background: "none",
+                        border: `1px solid ${comment.disliked ? "#555" : "#ddd"}`,
+                        borderRadius: 20,
+                        cursor: "pointer",
+                        color: comment.disliked ? "#555" : "#888",
+                        fontSize: "0.8rem",
+                        padding: "3px 10px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                      }}
+                    >
+                      👎 {comment.dislike_count}
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

@@ -25,6 +25,8 @@ func main() {
 	userRepo := persistence.NewUserRepository(db)
 	authUsecase := usecase.NewAuthUsecase(userRepo)
 	authHandler := handler.NewAuthHandler(authUsecase)
+	userUsecase := usecase.NewUserUsecase(userRepo)
+	userHandler := handler.NewUserHandler(userUsecase)
 
 	minioClient, minioErr := storage.NewMinioClient()
 	if minioErr != nil {
@@ -62,6 +64,9 @@ func main() {
 	// 作成・更新・削除・アップロードは認証必要
 	r.Group(func(r chi.Router) {
 		r.Use(authMiddleware.Auth)
+		r.Get("/api/me", userHandler.GetMe)
+		r.Put("/api/me", userHandler.UpdateMe)
+		r.Get("/api/me/avatar-upload-url", uploadHandler.PresignedAvatarURL)
 		r.Get("/api/me/videos", videoHandler.MyList)
 		r.Post("/api/videos", videoHandler.Create)
 		r.Put("/api/videos/{id}", videoHandler.Update)
@@ -70,19 +75,24 @@ func main() {
 		r.Get("/api/videos/{id}/thumbnail-upload-url", uploadHandler.PresignedThumbnailURL)
 		r.Post("/api/videos/{id}/generate-thumbnail", thumbnailHandler.Generate)
 		r.Post("/api/videos/{id}/transcode", transcodeHandler.Enqueue)
-		r.Post("/api/videos/{id}/like", likeHandler.Toggle)  // ← 追加
+		r.Post("/api/videos/{id}/like", likeHandler.Toggle)
+		r.Post("/api/videos/{id}/dislike", likeHandler.ToggleDislike)
+		r.Get("/api/videos/{id}/like-status", likeHandler.Status)
 	})
 	// ステータス確認は認証不要（一覧ページからも参照できるように）
 	r.Get("/api/videos/{id}/status", transcodeHandler.Status)
 
-	// いいね数の取得は誰でも見られる（認証不要）
+	// いいね数・よくないね数の取得は誰でも見られる（認証不要）
 	r.Get("/api/videos/{id}/likes", likeHandler.Count)
+	r.Get("/api/videos/{id}/dislikes", likeHandler.DislikeCount)
 
 	r.Post("/api/videos/{id}/view", videoHandler.IncrementViewCount)
 
-	// コメント（一覧は認証不要、投稿は認証必要）
+	// コメント（一覧は認証不要、投稿・いいねは認証必要）
 	r.Get("/api/videos/{id}/comments", commentHandler.List)
 	r.With(authMiddleware.Auth).Post("/api/videos/{id}/comments", commentHandler.Create)
+	r.With(authMiddleware.Auth).Post("/api/comments/{commentId}/like", commentHandler.ToggleLike)
+	r.With(authMiddleware.Auth).Post("/api/comments/{commentId}/dislike", commentHandler.ToggleDislike)
 
 	log.Println("Backend running on :8080")
 	if err := http.ListenAndServe(":8080", r); err != nil {
@@ -129,8 +139,12 @@ func migrate(db *sql.DB) {
 			id            BIGSERIAL PRIMARY KEY,
 			email         TEXT UNIQUE NOT NULL,
 			password_hash TEXT NOT NULL,
+			username      TEXT NOT NULL DEFAULT '',
+			avatar_url    TEXT NOT NULL DEFAULT '',
 			created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		);
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS username   TEXT NOT NULL DEFAULT '';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT NOT NULL DEFAULT '';
 		CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
 
 		CREATE TABLE IF NOT EXISTS videos (

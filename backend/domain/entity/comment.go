@@ -8,5 +8,9 @@ type Comment struct {
 	UserID    int64     `json:"user_id"`
 	Username  string    `json:"username"`
 	Body      string    `json:"body"`
-	CreatedAt time.Time `json:"created_at"`
+	LikeCount    int64     `json:"like_count"`
+	Liked        bool      `json:"liked"`
+	DislikeCount int64     `json:"dislike_count"`
+	Disliked     bool      `json:"disliked"`
+	CreatedAt    time.Time `json:"created_at"`
 }

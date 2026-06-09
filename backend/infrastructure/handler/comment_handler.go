@@ -52,7 +52,13 @@ func (h *CommentHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	comments, err := h.commentUsecase.FindByVideoID(videoID)
+	// ログイン中ならuserIDを取得（未ログインは0）
+	var userID int64
+	if id, ok := r.Context().Value(middleware.UserIDKey).(int64); ok {
+		userID = id
+	}
+
+	comments, err := h.commentUsecase.FindByVideoID(videoID, userID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -60,4 +66,40 @@ func (h *CommentHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(comments)
+}
+
+func (h *CommentHandler) ToggleLike(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDKey).(int64)
+	commentID, err := strconv.ParseInt(chi.URLParam(r, "commentId"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	count, liked, err := h.commentUsecase.ToggleLike(commentID, userID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"count": count, "liked": liked})
+}
+
+func (h *CommentHandler) ToggleDislike(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDKey).(int64)
+	commentID, err := strconv.ParseInt(chi.URLParam(r, "commentId"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	count, disliked, err := h.commentUsecase.ToggleDislike(commentID, userID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"count": count, "disliked": disliked})
 }
