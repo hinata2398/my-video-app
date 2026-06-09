@@ -25,14 +25,14 @@ func (r *CommentRepository) Create(videoID, userID int64, body string) (*entity.
 	if err != nil {
 		return nil, err
 	}
-	// メールアドレスを取得
-	r.db.QueryRow(`SELECT email FROM users WHERE id = $1`, userID).Scan(&c.Email)
+	// ユーザー名を取得
+	r.db.QueryRow(`SELECT username FROM users WHERE id = $1`, userID).Scan(&c.Username)
 	return c, nil
 }
 
 func (r *CommentRepository) FindByVideoID(videoID int64) ([]*entity.Comment, error) {
 	rows, err := r.db.Query(`
-		SELECT c.id, c.video_id, c.user_id, u.email, c.body, c.created_at
+		SELECT c.id, c.video_id, c.user_id, u.username, c.body, c.created_at
 		FROM comments c
 		JOIN users u ON u.id = c.user_id
 		WHERE c.video_id = $1
@@ -47,7 +47,7 @@ func (r *CommentRepository) FindByVideoID(videoID int64) ([]*entity.Comment, err
 	var comments []*entity.Comment
 	for rows.Next() {
 		c := &entity.Comment{}
-		if err := rows.Scan(&c.ID, &c.VideoID, &c.UserID, &c.Email, &c.Body, &c.CreatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.VideoID, &c.UserID, &c.Username, &c.Body, &c.CreatedAt); err != nil {
 			return nil, err
 		}
 		comments = append(comments, c)

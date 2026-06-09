@@ -20,7 +20,7 @@ type Video = {
 type Comment = {
   id: number;
   user_id: number;
-  email: string;
+  username: string;
   body: string;
   created_at: string;
 };
@@ -96,7 +96,9 @@ export default function VideoDetailPage() {
   };
 
   const fetchComments = async () => {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos/${id}/comments`);
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/videos/${id}/comments`,
+    );
     const data = await res.json();
     setComments(data);
   };
@@ -110,14 +112,17 @@ export default function VideoDetailPage() {
     }
     if (!commentBody.trim()) return;
 
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos/${id}/comments`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/videos/${id}/comments`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ body: commentBody }),
       },
-      body: JSON.stringify({ body: commentBody }),
-    });
+    );
     if (res.ok) {
       setCommentBody("");
       fetchComments();
@@ -250,8 +255,8 @@ export default function VideoDetailPage() {
         <div>
           <h1 style={{ margin: "0 0 0.25rem" }}>{video.title}</h1>
           <p style={{ color: "#888", fontSize: "0.9rem", margin: 0 }}>
-            {new Date(video.created_at).toLocaleDateString("ja-JP")}　👁{" "}
-            {video.view_count}
+            {new Date(video.created_at).toLocaleDateString("ja-JP")}　
+            {video.view_count}回視聴
           </p>
         </div>
         <button
@@ -289,11 +294,22 @@ export default function VideoDetailPage() {
       )}
 
       {/* コメントセクション */}
-      <div style={{ marginTop: "2rem", borderTop: "1px solid #eee", paddingTop: "1rem" }}>
-        <h2 style={{ fontSize: "1rem", marginBottom: "1rem" }}>コメント {comments.length}件</h2>
+      <div
+        style={{
+          marginTop: "2rem",
+          borderTop: "1px solid #eee",
+          paddingTop: "1rem",
+        }}
+      >
+        <h2 style={{ fontSize: "1rem", marginBottom: "1rem" }}>
+          コメント {comments.length}件
+        </h2>
 
         {/* コメント投稿フォーム */}
-        <form onSubmit={handleCommentSubmit} style={{ display: "flex", gap: 8, marginBottom: "1.5rem" }}>
+        <form
+          onSubmit={handleCommentSubmit}
+          style={{ display: "flex", gap: 8, marginBottom: "1.5rem" }}
+        >
           <input
             type="text"
             value={commentBody}
@@ -325,7 +341,9 @@ export default function VideoDetailPage() {
 
         {/* コメント一覧 */}
         {comments.length === 0 ? (
-          <p style={{ color: "#aaa", fontSize: "0.9rem" }}>まだコメントはありません</p>
+          <p style={{ color: "#aaa", fontSize: "0.9rem" }}>
+            まだコメントはありません
+          </p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {comments.map((comment) => (
@@ -344,16 +362,27 @@ export default function VideoDetailPage() {
                     flexShrink: 0,
                   }}
                 >
-                  {comment.email[0].toUpperCase()}
+                  {(comment.username || "?")[0].toUpperCase()}
                 </div>
                 <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-                    <span style={{ fontSize: "0.85rem", fontWeight: "bold" }}>{comment.email}</span>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      marginBottom: 2,
+                    }}
+                  >
+                    <span style={{ fontSize: "0.85rem", fontWeight: "bold" }}>
+                      {comment.username}
+                    </span>
                     <span style={{ fontSize: "0.75rem", color: "#aaa" }}>
                       {new Date(comment.created_at).toLocaleDateString("ja-JP")}
                     </span>
                   </div>
-                  <p style={{ margin: 0, fontSize: "0.9rem", lineHeight: 1.6 }}>{comment.body}</p>
+                  <p style={{ margin: 0, fontSize: "0.9rem", lineHeight: 1.6 }}>
+                    {comment.body}
+                  </p>
                 </div>
               </div>
             ))}

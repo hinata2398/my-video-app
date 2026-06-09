@@ -18,6 +18,7 @@ func NewAuthHandler(authUsecase *usecase.AuthUsecase) *AuthHandler {
 type authRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
+	Username string `json:"username"`
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
@@ -26,7 +27,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
-	token, err := h.authUsecase.Register(req.Email, req.Password)
+	token, err := h.authUsecase.Register(req.Email, req.Password, req.Username)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

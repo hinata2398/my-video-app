@@ -18,12 +18,12 @@ func NewAuthUsecase(userRepo repository.UserRepository) *AuthUsecase {
 	return &AuthUsecase{userRepo: userRepo}
 }
 
-func (u *AuthUsecase) Register(email, password string) (string, error) {
+func (u *AuthUsecase) Register(email, password, username string) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return "", err
 	}
-	user, err := u.userRepo.Create(email, string(hash))
+	user, err := u.userRepo.Create(email, string(hash), username)
 	if err != nil {
 		return "", err
 	}
