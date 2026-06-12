@@ -42,6 +42,10 @@ func (u *AuthUsecase) Login(email, password string) (string, error) {
 }
 
 func generateToken(userID int64) (string, error) {
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		return "", errors.New("JWT_SECRETが設定されていません")
+	}
 	claims := jwt.MapClaims{
 		"user_id": userID,
 		"exp":     time.Now().Add(24 * time.Hour).Unix(),

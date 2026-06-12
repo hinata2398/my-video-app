@@ -43,6 +43,9 @@ func main() {
 	likeRepo := persistence.NewLikeRepository(db)
 	likeUsecase := usecase.NewLikeUsecase(likeRepo)
 	likeHandler := handler.NewLikeHandler(likeUsecase)
+	bookmarkRepo := persistence.NewBookmarkRepository(db)
+	bookmarkUsecase := usecase.NewBookmarkUsecase(bookmarkRepo)
+	bookmarkHandler := handler.NewBookmarkHandler(bookmarkUsecase)
 
 	commentRepo := persistence.NewCommentRepository(db)
 	commentUsecase := usecase.NewCommentUsecase(commentRepo)
@@ -93,6 +96,11 @@ func main() {
 	r.With(authMiddleware.Auth).Post("/api/videos/{id}/comments", commentHandler.Create)
 	r.With(authMiddleware.Auth).Post("/api/comments/{commentId}/like", commentHandler.ToggleLike)
 	r.With(authMiddleware.Auth).Post("/api/comments/{commentId}/dislike", commentHandler.ToggleDislike)
+
+	// ブックマークの取得は認証必要
+	r.With(authMiddleware.Auth).Post("/api/videos/{id}/bookmark", bookmarkHandler.Toggle)
+	r.With(authMiddleware.Auth).Get("/api/videos/{id}/bookmark-status", bookmarkHandler.Status)
+	r.With(authMiddleware.Auth).Get("/api/bookmarks", bookmarkHandler.FindByUserID)
 
 	log.Println("Backend running on :8080")
 	if err := http.ListenAndServe(":8080", r); err != nil {
@@ -167,6 +175,47 @@ func migrate(db *sql.DB) {
 			user_id    BIGINT NOT NULL,
 			video_id   BIGINT NOT NULL,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+
+		CREATE TABLE IF NOT EXISTS video_dislikes (
+			id         BIGSERIAL PRIMARY KEY,
+			user_id    BIGINT NOT NULL,
+			video_id   BIGINT NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			UNIQUE(user_id, video_id)
+		);
+
+		CREATE TABLE IF NOT EXISTS comments (
+			id         BIGSERIAL PRIMARY KEY,
+			video_id   BIGINT NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+			user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			body       TEXT NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+		CREATE INDEX IF NOT EXISTS idx_comments_video_id ON comments (video_id);
+
+		CREATE TABLE IF NOT EXISTS comment_likes (
+			id         BIGSERIAL PRIMARY KEY,
+			comment_id BIGINT NOT NULL REFERENCES comments(id) ON DELETE CASCADE,
+			user_id    BIGINT NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			UNIQUE(comment_id, user_id)
+		);
+
+		CREATE TABLE IF NOT EXISTS comment_dislikes (
+			id         BIGSERIAL PRIMARY KEY,
+			comment_id BIGINT NOT NULL REFERENCES comments(id) ON DELETE CASCADE,
+			user_id    BIGINT NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			UNIQUE(comment_id, user_id)
+		);
+
+		CREATE TABLE IF NOT EXISTS bookmarks (
+			id         BIGSERIAL PRIMARY KEY,
+			user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			video_id   BIGINT NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			UNIQUE(user_id, video_id)
 		);
 	`)
 	if err != nil {

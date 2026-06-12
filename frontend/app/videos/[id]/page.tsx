@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import HlsPlayer from "../../components/HlsPlayer";
+import BookmarkButton from "../../components/BookmarkButton";
 
 type Video = {
   id: number;
@@ -39,6 +40,7 @@ export default function VideoDetailPage() {
   const [liked, setLiked] = useState(false);
   const [dislikeCount, setDislikeCount] = useState(0);
   const [disliked, setDisliked] = useState(false);
+  const [bookmarked, setBookmarked] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentBody, setCommentBody] = useState("");
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -85,6 +87,20 @@ export default function VideoDetailPage() {
         setLiked(statusData.liked);
         setDisliked(statusData.disliked);
       }
+    }
+  };
+
+  const fetchBookmarkStatus = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/videos/${id}/bookmark-status`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    if (res.ok) {
+      const data = await res.json();
+      setBookmarked(data.bookmarked);
     }
   };
 
@@ -192,7 +208,9 @@ export default function VideoDetailPage() {
                 ...c,
                 like_count: data.count,
                 liked: data.liked,
-                dislike_count: data.liked ? Math.max(0, c.dislike_count - 1) : c.dislike_count,
+                dislike_count: data.liked
+                  ? Math.max(0, c.dislike_count - 1)
+                  : c.dislike_count,
                 disliked: data.liked ? false : c.disliked,
               }
             : c,
@@ -223,7 +241,9 @@ export default function VideoDetailPage() {
                 ...c,
                 dislike_count: data.count,
                 disliked: data.disliked,
-                like_count: data.disliked ? Math.max(0, c.like_count - 1) : c.like_count,
+                like_count: data.disliked
+                  ? Math.max(0, c.like_count - 1)
+                  : c.like_count,
                 liked: data.disliked ? false : c.liked,
               }
             : c,
@@ -236,6 +256,7 @@ export default function VideoDetailPage() {
   useEffect(() => {
     fetchVideo();
     fetchLikes();
+    fetchBookmarkStatus();
     fetchComments();
   }, [id]);
 
@@ -397,6 +418,7 @@ export default function VideoDetailPage() {
           >
             👎 {dislikeCount}
           </button>
+          <BookmarkButton videoID={video.id} initialBookmarked={bookmarked} />
         </div>
       </div>
 
