@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import userEvent from "@testing-library/user-event";
 
 type Me = {
   username: string;
@@ -72,19 +71,6 @@ export default function Header() {
               }}
             >
               マイページ
-            </Link>
-            <Link
-              href="/videos/new"
-              style={{
-                background: "#e00",
-                color: "#fff",
-                textDecoration: "none",
-                padding: "0.4rem 1rem",
-                borderRadius: 4,
-                fontSize: "0.9rem",
-              }}
-            >
-              + 投稿する
             </Link>
             {/* アバター → プロフィール編集へ */}
             <Link href="/profile" style={{ textDecoration: "none" }}>

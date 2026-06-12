@@ -34,7 +34,6 @@ describe("Header", () => {
 
     await waitFor(() => {
       expect(screen.getByText("マイページ")).toBeInTheDocument();
-      expect(screen.getByText("+ 投稿する")).toBeInTheDocument();
       expect(screen.getByText("ログアウト")).toBeInTheDocument();
     });
   });
