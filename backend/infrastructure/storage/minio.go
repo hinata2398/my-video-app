@@ -11,10 +11,11 @@ import (
 )
 
 type MinioClient struct {
-	internalClient *minio.Client
-	publicClient   *minio.Client
-	bucket         string
-	publicEndpoint string
+	internalClient   *minio.Client
+	publicClient     *minio.Client
+	bucket           string
+	publicEndpoint   string
+	internalEndpoint string
 }
 
 func NewMinioClient() (*MinioClient, error) {
@@ -69,10 +70,11 @@ func NewMinioClient() (*MinioClient, error) {
 	}
 
 	return &MinioClient{
-		internalClient: internalClient,
-		publicClient:   publicClient,
-		bucket:         bucket,
-		publicEndpoint: publicEndpoint,
+		internalClient:   internalClient,
+		publicClient:     publicClient,
+		bucket:           bucket,
+		publicEndpoint:   publicEndpoint,
+		internalEndpoint: internalEndpoint,
 	}, nil
 }
 
@@ -87,5 +89,12 @@ func (m *MinioClient) PresignedUploadURL(ctx context.Context, objectName string)
 }
 
 func (m *MinioClient) PublicURL(objectName string) string {
+	if objectName == "" {
+		return ""
+	}
 	return fmt.Sprintf("http://%s/%s/%s", m.publicEndpoint, m.bucket, objectName)
+}
+
+func (m *MinioClient) InternalURL(key string) string {
+	return fmt.Sprintf("http://%s/%s/%s", m.internalEndpoint, m.bucket, key)
 }

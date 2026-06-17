@@ -41,5 +41,5 @@ func (m *MinioClient) GenerateThumbnail(ctx context.Context, videoURL, objectNam
 		return "", fmt.Errorf("minio upload error: %w", err)
 	}
 
-	return m.PublicURL(objectName), nil
+	return objectName, nil
 }

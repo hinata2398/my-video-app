@@ -10,10 +10,11 @@ import (
 
 type UserHandler struct {
 	userUsecase *usecase.UserUsecase
+	resolver    MediaURLResolver
 }
 
-func NewUserHandler(userUsecase *usecase.UserUsecase) *UserHandler {
-	return &UserHandler{userUsecase: userUsecase}
+func NewUserHandler(userUsecase *usecase.UserUsecase, resolver MediaURLResolver) *UserHandler {
+	return &UserHandler{userUsecase: userUsecase, resolver: resolver}
 }
 
 // GET /api/me - 自分のプロフィール取得
@@ -27,6 +28,7 @@ func (h *UserHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	resolveUser(user, h.resolver)
 	json.NewEncoder(w).Encode(user)
 }
 
@@ -50,5 +52,6 @@ func (h *UserHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	resolveUser(user, h.resolver)
 	json.NewEncoder(w).Encode(user)
 }

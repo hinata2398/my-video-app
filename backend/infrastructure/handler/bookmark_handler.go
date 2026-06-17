@@ -13,9 +13,10 @@ import (
 
 type BookmarkHandler struct {
 	bookmarkUsecase *usecase.BookmarkUsecase
+	resolver        MediaURLResolver
 }
 
-func NewBookmarkHandler(bookmarkUsecase *usecase.BookmarkUsecase) *BookmarkHandler {
+func NewBookmarkHandler(bookmarkUsecase *usecase.BookmarkUsecase, resolver MediaURLResolver) *BookmarkHandler {
 	return &BookmarkHandler{bookmarkUsecase: bookmarkUsecase}
 }
 
@@ -76,5 +77,6 @@ func (h *BookmarkHandler) FindByUserID(w http.ResponseWriter, r *http.Request) {
 		videos = make([]*entity.Video, 0)
 	}
 	w.Header().Set("Content-Type", "application/json")
+	resolveVideos(videos, h.resolver)
 	json.NewEncoder(w).Encode(videos)
 }

@@ -3,7 +3,6 @@ package handler
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 
@@ -44,12 +43,9 @@ func (h *TranscodeHandler) Enqueue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// MinIO内部URLに変換
-	internalURL := fmt.Sprintf("http://minio:9000/%s", extractPath(videoURL))
-
 	h.queue.Enqueue(queue.TranscodeJob{
 		VideoID:  videoID,
-		VideoURL: internalURL,
+		VideoKey: videoURL,
 	})
 
 	// ステータスをpendingに更新
@@ -83,13 +79,4 @@ func (h *TranscodeHandler) Status(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": status, "message": message})
-}
-
-// extractPath は "http://localhost:9000/videos/foo/bar.mp4" → "videos/foo/bar.mp4"
-func extractPath(publicURL string) string {
-	const prefix = "http://localhost:9000/"
-	if len(publicURL) > len(prefix) {
-		return publicURL[len(prefix):]
-	}
-	return publicURL
 }

@@ -7,6 +7,7 @@ type Props = {
   src: string;
   poster?: string;
   onView?: () => void;
+  onWatchHistory?: () => void;
 };
 
 type QualityLevel = {
@@ -14,7 +15,7 @@ type QualityLevel = {
   label: string;
 };
 
-export default function HlsPlayer({ src, poster, onView }: Props) {
+export default function HlsPlayer({ src, poster, onView, onWatchHistory }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const [levels, setLevels] = useState<QualityLevel[]>([]);
@@ -33,6 +34,7 @@ export default function HlsPlayer({ src, poster, onView }: Props) {
       if (!counted && video.currentTime >= 10) {
         counted = true;
         onView?.();
+        onWatchHistory?.();
       }
     };
     video.addEventListener("timeupdate", handleTimeUpdate);

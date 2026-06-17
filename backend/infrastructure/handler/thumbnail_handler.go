@@ -47,8 +47,7 @@ func (h *ThumbnailHandler) Generate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// FFmpegに渡すURLはMinIO内部アドレス（バックエンドから直接アクセス）
-	// videoURLはlocalhost:9000なので内部向けに変換
-	internalVideoURL := fmt.Sprintf("http://minio:9000/%s", extractMinioPath(videoURL))
+	internalVideoURL := h.minio.InternalURL(videoURL)
 	objectName := fmt.Sprintf("thumbnails/%d/%d_auto.jpg", videoID, time.Now().Unix())
 
 	thumbnailURL, err := h.minio.GenerateThumbnail(r.Context(), internalVideoURL, objectName)
@@ -69,15 +68,5 @@ func (h *ThumbnailHandler) Generate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"thumbnail_url": thumbnailURL})
-}
-
-// "http://localhost:9000/videos/foo/bar.mp4" → "videos/foo/bar.mp4"
-func extractMinioPath(publicURL string) string {
-	// http://localhost:9000/ の後の部分を取得
-	const prefix = "http://localhost:9000/"
-	if len(publicURL) > len(prefix) {
-		return publicURL[len(prefix):]
-	}
-	return publicURL
+	json.NewEncoder(w).Encode(map[string]string{"thumbnail_url": h.minio.PublicURL(thumbnailURL)})
 }

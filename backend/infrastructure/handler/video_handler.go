@@ -13,10 +13,11 @@ import (
 
 type VideoHandler struct {
 	videoUsecase *usecase.VideoUsecase
+	resolver     MediaURLResolver
 }
 
-func NewVideoHandler(videoUsecase *usecase.VideoUsecase) *VideoHandler {
-	return &VideoHandler{videoUsecase: videoUsecase}
+func NewVideoHandler(videoUsecase *usecase.VideoUsecase, resolver MediaURLResolver) *VideoHandler {
+	return &VideoHandler{videoUsecase: videoUsecase, resolver: resolver}
 }
 
 type videoRequest struct {
@@ -37,6 +38,7 @@ func (h *VideoHandler) MyList(w http.ResponseWriter, r *http.Request) {
 		videos = make([]*entity.Video, 0)
 	}
 	w.Header().Set("Content-Type", "application/json")
+	resolveVideos(videos, h.resolver)
 	json.NewEncoder(w).Encode(videos)
 }
 
@@ -51,6 +53,7 @@ func (h *VideoHandler) List(w http.ResponseWriter, r *http.Request) {
 		videos = make([]*entity.Video, 0)
 	}
 	w.Header().Set("Content-Type", "application/json")
+	resolveVideos(videos, h.resolver)
 	json.NewEncoder(w).Encode(videos)
 }
 
@@ -66,6 +69,7 @@ func (h *VideoHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	resolveVideo(video, h.resolver)
 	json.NewEncoder(w).Encode(video)
 }
 
@@ -83,6 +87,7 @@ func (h *VideoHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
+	resolveVideo(video, h.resolver)
 	json.NewEncoder(w).Encode(video)
 }
 
@@ -104,6 +109,7 @@ func (h *VideoHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	resolveVideo(video, h.resolver)
 	json.NewEncoder(w).Encode(video)
 }
 

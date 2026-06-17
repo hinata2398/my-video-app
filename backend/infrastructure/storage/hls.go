@@ -85,7 +85,7 @@ func (m *MinioClient) GenerateHLS(ctx context.Context, videoURL, hlsPrefix strin
 		return "", err
 	}
 
-	return m.PublicURL(fmt.Sprintf("%s/master.m3u8", hlsPrefix)), nil
+	return fmt.Sprintf("%s/master.m3u8", hlsPrefix), nil
 }
 
 // "800k" → "800000" に変換（master.m3u8 に必要な単位）

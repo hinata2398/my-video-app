@@ -12,7 +12,7 @@ import (
 
 type TranscodeJob struct {
 	VideoID  int64
-	VideoURL string // MinIO内部URL（http://minio:9000/...）
+	VideoKey string // MinIO内部URL（http://minio:9000/...）
 }
 
 type TranscodeQueue struct {
@@ -51,19 +51,22 @@ func (q *TranscodeQueue) process(job TranscodeJob) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
+	// キー → ffmpegが読める内部URL（minio:9000）に変換
+	internalURL := q.minio.InternalURL(job.VideoKey)
+
 	// 1. HLS変換（.m3u8 + .tsセグメント）
 	hlsPrefix := fmt.Sprintf("hls/%d/%d", job.VideoID, time.Now().Unix())
-	hlsURL, err := q.minio.GenerateHLS(ctx, job.VideoURL, hlsPrefix)
+	hlsKey, err := q.minio.GenerateHLS(ctx, internalURL, hlsPrefix)
 	if err != nil {
 		log.Printf("HLS failed: video_id=%d, err=%v", job.VideoID, err)
 		q.updateStatus(job.VideoID, "error", err.Error())
 		return
 	}
 
-	// video_url をHLSプレイリストのURLに更新
+	// video_url をHLSプレイリストのキーに更新
 	_, err = q.db.Exec(
 		`UPDATE videos SET video_url = $1, updated_at = NOW() WHERE id = $2`,
-		hlsURL, job.VideoID,
+		hlsKey, job.VideoID,
 	)
 	if err != nil {
 		log.Printf("db update failed: video_id=%d, err=%v", job.VideoID, err)
@@ -73,18 +76,18 @@ func (q *TranscodeQueue) process(job TranscodeJob) {
 
 	// 2. サムネイル自動生成（thumbnail_urlが空の場合のみ）
 	thumbObjectName := fmt.Sprintf("thumbnails/%d/%d_auto.jpg", job.VideoID, time.Now().Unix())
-	thumbnailURL, err := q.minio.GenerateThumbnail(ctx, job.VideoURL, thumbObjectName)
+	thumbnailKey, err := q.minio.GenerateThumbnail(ctx, internalURL, thumbObjectName)
 	if err != nil {
 		log.Printf("thumbnail failed (non-fatal): video_id=%d, err=%v", job.VideoID, err)
 	} else {
 		q.db.Exec(
 			`UPDATE videos SET thumbnail_url = $1, updated_at = NOW() WHERE id = $2 AND thumbnail_url = ''`,
-			thumbnailURL, job.VideoID,
+			thumbnailKey, job.VideoID,
 		)
 	}
 
 	q.updateStatus(job.VideoID, "done", "")
-	log.Printf("transcode done: video_id=%d hls=%s", job.VideoID, hlsURL)
+	log.Printf("transcode done: video_id=%d hls=%s", job.VideoID, hlsKey)
 }
 
 func (q *TranscodeQueue) updateStatus(videoID int64, status, errMsg string) {

@@ -104,6 +104,18 @@ export default function VideoDetailPage() {
     }
   };
 
+  const addWatchHistory = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/videos/${id}/watch-history`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+  };
+
   const handleLike = async () => {
     const token = localStorage.getItem("token");
     if (!token) {
@@ -342,6 +354,7 @@ export default function VideoDetailPage() {
             src={video.video_url}
             poster={video.thumbnail_url || undefined}
             onView={incrementViewCount}
+            onWatchHistory={addWatchHistory}
           />
         ) : video.thumbnail_url ? (
           <img

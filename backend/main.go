@@ -22,20 +22,20 @@ func main() {
 	db := connectDB()
 	defer db.Close()
 
-	userRepo := persistence.NewUserRepository(db)
-	authUsecase := usecase.NewAuthUsecase(userRepo)
-	authHandler := handler.NewAuthHandler(authUsecase)
-	userUsecase := usecase.NewUserUsecase(userRepo)
-	userHandler := handler.NewUserHandler(userUsecase)
-
 	minioClient, minioErr := storage.NewMinioClient()
 	if minioErr != nil {
 		log.Fatal("Could not connect to MinIO:", minioErr)
 	}
 
+	userRepo := persistence.NewUserRepository(db)
+	authUsecase := usecase.NewAuthUsecase(userRepo)
+	authHandler := handler.NewAuthHandler(authUsecase)
+	userUsecase := usecase.NewUserUsecase(userRepo)
+	userHandler := handler.NewUserHandler(userUsecase, minioClient)
+
 	videoRepo := persistence.NewVideoRepository(db)
 	videoUsecase := usecase.NewVideoUsecase(videoRepo)
-	videoHandler := handler.NewVideoHandler(videoUsecase)
+	videoHandler := handler.NewVideoHandler(videoUsecase, minioClient)
 	uploadHandler := handler.NewUploadHandler(minioClient)
 	thumbnailHandler := handler.NewThumbnailHandler(minioClient, db)
 	transcodeQueue := queue.NewTranscodeQueue(minioClient, db, 2) // worker 2本
@@ -45,11 +45,14 @@ func main() {
 	likeHandler := handler.NewLikeHandler(likeUsecase)
 	bookmarkRepo := persistence.NewBookmarkRepository(db)
 	bookmarkUsecase := usecase.NewBookmarkUsecase(bookmarkRepo)
-	bookmarkHandler := handler.NewBookmarkHandler(bookmarkUsecase)
+	bookmarkHandler := handler.NewBookmarkHandler(bookmarkUsecase, minioClient)
 
 	commentRepo := persistence.NewCommentRepository(db)
 	commentUsecase := usecase.NewCommentUsecase(commentRepo)
 	commentHandler := handler.NewCommentHandler(commentUsecase)
+	watchHistoryRepo := persistence.NewWatchHistoryRepository(db)
+	watchHistoryUsecase := usecase.NewWatchHistoryUsecase(watchHistoryRepo)
+	watchHistoryHandler := handler.NewWatchHistoryHandler(watchHistoryUsecase, minioClient)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -101,6 +104,10 @@ func main() {
 	r.With(authMiddleware.Auth).Post("/api/videos/{id}/bookmark", bookmarkHandler.Toggle)
 	r.With(authMiddleware.Auth).Get("/api/videos/{id}/bookmark-status", bookmarkHandler.Status)
 	r.With(authMiddleware.Auth).Get("/api/bookmarks", bookmarkHandler.FindByUserID)
+
+	// 視聴履歴の取得は認証必要
+	r.With(authMiddleware.Auth).Post("/api/videos/{id}/watch-history", watchHistoryHandler.Add)
+	r.With(authMiddleware.Auth).Get("/api/watch-history", watchHistoryHandler.FindByUserID)
 
 	log.Println("Backend running on :8080")
 	if err := http.ListenAndServe(":8080", r); err != nil {
@@ -215,6 +222,14 @@ func migrate(db *sql.DB) {
 			user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			video_id   BIGINT NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			UNIQUE(user_id, video_id)
+		);
+
+		CREATE TABLE IF NOT EXISTS watch_histories (
+			id BIGSERIAL PRIMARY KEY,
+			user_id BIGINT NOT NULL REFERENCES users(id),
+			video_id BIGINT NOT NULL REFERENCES videos(id),
+			watched_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 			UNIQUE(user_id, video_id)
 		);
 	`)

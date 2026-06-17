@@ -34,12 +34,10 @@ func (h *UploadHandler) PresignedURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	publicURL := h.minio.PublicURL(objectName)
-
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"upload_url": url,
-		"video_url":  publicURL,
+		"video_url":  objectName,
 	})
 }
 
@@ -54,12 +52,10 @@ func (h *UploadHandler) PresignedAvatarURL(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	publicURL := h.minio.PublicURL(objectName)
-
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"upload_url": url,
-		"avatar_url": publicURL,
+		"avatar_url": objectName,
 	})
 }
 
@@ -74,11 +70,9 @@ func (h *UploadHandler) PresignedThumbnailURL(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	publicURL := h.minio.PublicURL(objectName)
-
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"upload_url":    url,
-		"thumbnail_url": publicURL,
+		"thumbnail_url": objectName,
 	})
 }
