@@ -27,17 +27,20 @@ func main() {
 		log.Fatal("Could not connect to MinIO:", minioErr)
 	}
 
+	mediaHandler := handler.NewMediaHandler(minioClient)
+	mediaResolver := handler.NewProxyResolver(os.Getenv("BACKEND_PUBLIC_URL"))
+
 	userRepo := persistence.NewUserRepository(db)
 	authUsecase := usecase.NewAuthUsecase(userRepo)
 	authHandler := handler.NewAuthHandler(authUsecase)
 	userUsecase := usecase.NewUserUsecase(userRepo)
-	userHandler := handler.NewUserHandler(userUsecase, minioClient)
+	userHandler := handler.NewUserHandler(userUsecase, mediaResolver)
 
 	videoRepo := persistence.NewVideoRepository(db)
 	videoUsecase := usecase.NewVideoUsecase(videoRepo)
-	videoHandler := handler.NewVideoHandler(videoUsecase, minioClient)
+	videoHandler := handler.NewVideoHandler(videoUsecase, mediaResolver)
 	uploadHandler := handler.NewUploadHandler(minioClient)
-	thumbnailHandler := handler.NewThumbnailHandler(minioClient, db)
+	thumbnailHandler := handler.NewThumbnailHandler(minioClient, db, mediaResolver)
 	transcodeQueue := queue.NewTranscodeQueue(minioClient, db, 2) // worker 2本
 	transcodeHandler := handler.NewTranscodeHandler(transcodeQueue, db)
 	likeRepo := persistence.NewLikeRepository(db)
@@ -45,14 +48,14 @@ func main() {
 	likeHandler := handler.NewLikeHandler(likeUsecase)
 	bookmarkRepo := persistence.NewBookmarkRepository(db)
 	bookmarkUsecase := usecase.NewBookmarkUsecase(bookmarkRepo)
-	bookmarkHandler := handler.NewBookmarkHandler(bookmarkUsecase, minioClient)
+	bookmarkHandler := handler.NewBookmarkHandler(bookmarkUsecase, mediaResolver)
 
 	commentRepo := persistence.NewCommentRepository(db)
 	commentUsecase := usecase.NewCommentUsecase(commentRepo)
 	commentHandler := handler.NewCommentHandler(commentUsecase)
 	watchHistoryRepo := persistence.NewWatchHistoryRepository(db)
 	watchHistoryUsecase := usecase.NewWatchHistoryUsecase(watchHistoryRepo)
-	watchHistoryHandler := handler.NewWatchHistoryHandler(watchHistoryUsecase, minioClient)
+	watchHistoryHandler := handler.NewWatchHistoryHandler(watchHistoryUsecase, mediaResolver)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -66,6 +69,7 @@ func main() {
 	// 動画一覧・詳細は認証不要
 	r.Get("/api/videos", videoHandler.List)
 	r.Get("/api/videos/{id}", videoHandler.Get)
+	r.Get("/media/*", mediaHandler.Serve)
 
 	// 作成・更新・削除・アップロードは認証必要
 	r.Group(func(r chi.Router) {

@@ -15,12 +15,13 @@ import (
 )
 
 type ThumbnailHandler struct {
-	minio *storage.MinioClient
-	db    *sql.DB
+	minio    *storage.MinioClient
+	db       *sql.DB
+	resolver MediaURLResolver
 }
 
-func NewThumbnailHandler(minio *storage.MinioClient, db *sql.DB) *ThumbnailHandler {
-	return &ThumbnailHandler{minio: minio, db: db}
+func NewThumbnailHandler(minio *storage.MinioClient, db *sql.DB, resolver MediaURLResolver) *ThumbnailHandler {
+	return &ThumbnailHandler{minio: minio, db: db, resolver: resolver}
 }
 
 func (h *ThumbnailHandler) Generate(w http.ResponseWriter, r *http.Request) {
@@ -46,11 +47,16 @@ func (h *ThumbnailHandler) Generate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// FFmpegに渡すURLはMinIO内部アドレス（バックエンドから直接アクセス）
-	internalVideoURL := h.minio.InternalURL(videoURL)
+	// FFmpegに渡すURLは presigned GET（非公開バケットでも署名付きで読める）
+	inputURL, err := h.minio.PresignedGetURL(r.Context(), videoURL)
+	if err != nil {
+		log.Printf("presigned get error: %v", err)
+		http.Error(w, "サムネイル生成に失敗しました", http.StatusInternalServerError)
+		return
+	}
 	objectName := fmt.Sprintf("thumbnails/%d/%d_auto.jpg", videoID, time.Now().Unix())
 
-	thumbnailURL, err := h.minio.GenerateThumbnail(r.Context(), internalVideoURL, objectName)
+	thumbnailURL, err := h.minio.GenerateThumbnail(r.Context(), inputURL, objectName)
 	if err != nil {
 		log.Printf("thumbnail generation error: %v", err)
 		http.Error(w, "サムネイル生成に失敗しました", http.StatusInternalServerError)
@@ -68,5 +74,5 @@ func (h *ThumbnailHandler) Generate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"thumbnail_url": h.minio.PublicURL(thumbnailURL)})
+	json.NewEncoder(w).Encode(map[string]string{"thumbnail_url": h.resolver.PublicURL(thumbnailURL)})
 }

@@ -52,11 +52,15 @@ func (q *TranscodeQueue) process(job TranscodeJob) {
 	defer cancel()
 
 	// キー → ffmpegが読める内部URL（minio:9000）に変換
-	internalURL := q.minio.InternalURL(job.VideoKey)
+	inputURL, err := q.minio.PresignedGetURL(ctx, job.VideoKey)
+	if err != nil {
+		q.updateStatus(job.VideoID, "error", err.Error())
+		return
+	}
 
 	// 1. HLS変換（.m3u8 + .tsセグメント）
 	hlsPrefix := fmt.Sprintf("hls/%d/%d", job.VideoID, time.Now().Unix())
-	hlsKey, err := q.minio.GenerateHLS(ctx, internalURL, hlsPrefix)
+	hlsKey, err := q.minio.GenerateHLS(ctx, inputURL, hlsPrefix)
 	if err != nil {
 		log.Printf("HLS failed: video_id=%d, err=%v", job.VideoID, err)
 		q.updateStatus(job.VideoID, "error", err.Error())
@@ -76,7 +80,7 @@ func (q *TranscodeQueue) process(job TranscodeJob) {
 
 	// 2. サムネイル自動生成（thumbnail_urlが空の場合のみ）
 	thumbObjectName := fmt.Sprintf("thumbnails/%d/%d_auto.jpg", job.VideoID, time.Now().Unix())
-	thumbnailKey, err := q.minio.GenerateThumbnail(ctx, internalURL, thumbObjectName)
+	thumbnailKey, err := q.minio.GenerateThumbnail(ctx, inputURL, thumbObjectName)
 	if err != nil {
 		log.Printf("thumbnail failed (non-fatal): video_id=%d, err=%v", job.VideoID, err)
 	} else {

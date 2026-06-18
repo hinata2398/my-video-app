@@ -17,7 +17,7 @@ type WatchHistoryHandler struct {
 }
 
 func NewWatchHistoryHandler(watchHistoryUsecase *usecase.WatchHistoryUsecase, resolver MediaURLResolver) *WatchHistoryHandler {
-	return &WatchHistoryHandler{watchHistoryUsecase: watchHistoryUsecase}
+	return &WatchHistoryHandler{watchHistoryUsecase: watchHistoryUsecase, resolver: resolver}
 }
 
 func (h *WatchHistoryHandler) Add(w http.ResponseWriter, r *http.Request) {
