@@ -28,7 +28,13 @@ func main() {
 	}
 
 	mediaHandler := handler.NewMediaHandler(minioClient)
-	mediaResolver := handler.NewProxyResolver(os.Getenv("BACKEND_PUBLIC_URL"))
+	var mediaResolver handler.MediaURLResolver
+	switch os.Getenv("MEDIA_DELIVERY") {
+	case "cloudfront":
+		mediaResolver = handler.NewCloudFrontResolver(os.Getenv("MEDIA_BASE_URL"))
+	default:
+		mediaResolver = handler.NewProxyResolver(os.Getenv("MEDIA_BASE_URL"))
+	}
 
 	userRepo := persistence.NewUserRepository(db)
 	authUsecase := usecase.NewAuthUsecase(userRepo)
@@ -178,6 +184,7 @@ func migrate(db *sql.DB) {
 			created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 			updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		);
+		ALTER TABLE videos ADD COLUMN IF NOT EXISTS view_count BIGINT NOT NULL DEFAULT 0;
 		CREATE INDEX IF NOT EXISTS idx_videos_created_at ON videos (created_at DESC);
 		CREATE INDEX IF NOT EXISTS idx_videos_user_id ON videos (user_id);
 
