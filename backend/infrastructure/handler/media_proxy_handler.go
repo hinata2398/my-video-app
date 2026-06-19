@@ -50,3 +50,18 @@ func (p *ProxyResolver) PublicURL(key string) string {
 	}
 	return p.baseURL + "/media/" + key
 }
+
+type CloudFrontResolver struct {
+	baseURL string // 例: https://dxxxx.cloudfront.net
+}
+
+func NewCloudFrontResolver(baseURL string) *CloudFrontResolver {
+	return &CloudFrontResolver{baseURL: baseURL}
+}
+
+func (c *CloudFrontResolver) PublicURL(key string) string {
+	if key == "" {
+		return ""
+	}
+	return c.baseURL + "/" + key
+}
