@@ -1,0 +1,86 @@
+<svg width="680" height="590" viewBox="0 0 680 590" role="img" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif">
+<title>my-video-app の AWS 目標アーキテクチャ</title>
+<desc>ブラウザからRoute53を経由し、アプリは WAF→ALB→EC2 Auto Scaling→RDS/Aurora、メディアは CloudFront→S3（構築済み）。EC2はEFSとS3を利用。CloudWatchとSSMが全体を横断。</desc>
+<rect x="0" y="0" width="680" height="590" fill="#ffffff"/>
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
+<style>
+.t{font-size:14px;font-weight:500}.s{font-size:12px}
+.arr{stroke:#888780;stroke-width:1.5px;fill:none}
+</style>
+</defs>
+
+<g>
+<rect x="265" y="40" width="150" height="46" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text class="t" x="340" y="62" text-anchor="middle" fill="#2C2C2A">ブラウザ</text>
+<text class="s" x="340" y="78" text-anchor="middle" fill="#5F5E5A">Next.js / hls.js</text>
+</g>
+
+<g>
+<rect x="265" y="110" width="150" height="46" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+<text class="t" x="340" y="132" text-anchor="middle" fill="#0C447C">Route 53</text>
+<text class="s" x="340" y="148" text-anchor="middle" fill="#185FA5">DNS</text>
+</g>
+
+<line class="arr" x1="340" y1="86" x2="340" y2="108" marker-end="url(#arrow)"/>
+<line class="arr" x1="312" y1="156" x2="190" y2="184" marker-end="url(#arrow)"/>
+<line class="arr" x1="368" y1="156" x2="510" y2="184" marker-end="url(#arrow)"/>
+
+<g>
+<rect x="105" y="186" width="150" height="46" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+<text class="t" x="180" y="208" text-anchor="middle" fill="#0C447C">WAF</text>
+<text class="s" x="180" y="224" text-anchor="middle" fill="#185FA5">レート制限・防御</text>
+</g>
+<g>
+<rect x="105" y="262" width="150" height="46" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+<text class="t" x="180" y="284" text-anchor="middle" fill="#0C447C">ALB</text>
+<text class="s" x="180" y="300" text-anchor="middle" fill="#185FA5">ルーティング・TLS</text>
+</g>
+<g>
+<rect x="105" y="338" width="150" height="46" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+<text class="t" x="180" y="360" text-anchor="middle" fill="#3C3489">EC2 Auto Scaling</text>
+<text class="s" x="180" y="376" text-anchor="middle" fill="#534AB7">Go + Next.js</text>
+</g>
+<g>
+<rect x="105" y="414" width="150" height="46" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text class="t" x="180" y="436" text-anchor="middle" fill="#085041">RDS / Aurora</text>
+<text class="s" x="180" y="452" text-anchor="middle" fill="#0F6E56">PostgreSQL</text>
+</g>
+
+<g>
+<rect x="290" y="414" width="130" height="46" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text class="t" x="355" y="436" text-anchor="middle" fill="#085041">EFS</text>
+<text class="s" x="355" y="452" text-anchor="middle" fill="#0F6E56">共有スクラッチ</text>
+</g>
+
+<g>
+<rect x="445" y="186" width="150" height="46" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+<text class="t" x="520" y="208" text-anchor="middle" fill="#0C447C">CloudFront ✓</text>
+<text class="s" x="520" y="224" text-anchor="middle" fill="#185FA5">配信・キャッシュ</text>
+</g>
+<g>
+<rect x="445" y="338" width="150" height="46" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text class="t" x="520" y="360" text-anchor="middle" fill="#085041">S3 ✓</text>
+<text class="s" x="520" y="376" text-anchor="middle" fill="#0F6E56">動画・HLS・サムネ</text>
+</g>
+
+<line class="arr" x1="180" y1="232" x2="180" y2="260" marker-end="url(#arrow)"/>
+<line class="arr" x1="180" y1="308" x2="180" y2="336" marker-end="url(#arrow)"/>
+<line class="arr" x1="180" y1="384" x2="180" y2="412" marker-end="url(#arrow)"/>
+<line class="arr" x1="232" y1="384" x2="330" y2="412" marker-end="url(#arrow)"/>
+<line class="arr" x1="520" y1="232" x2="520" y2="336" marker-end="url(#arrow)"/>
+<path class="arr" d="M255 360 L443 360" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+
+<g>
+<rect x="105" y="498" width="230" height="46" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text class="t" x="220" y="520" text-anchor="middle" fill="#2C2C2A">CloudWatch</text>
+<text class="s" x="220" y="536" text-anchor="middle" fill="#5F5E5A">ログ・メトリクス・アラーム</text>
+</g>
+<g>
+<rect x="365" y="498" width="230" height="46" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text class="t" x="480" y="520" text-anchor="middle" fill="#2C2C2A">SSM</text>
+<text class="s" x="480" y="536" text-anchor="middle" fill="#5F5E5A">ログイン・秘密情報管理</text>
+</g>
+
+<text class="s" x="105" y="575" fill="#5F5E5A">青=エッジ/配信　紫=コンピュート　緑=データ　点線=バックエンドのHLS書き込み　✓=構築済み</text>
+</svg>
