@@ -22,8 +22,8 @@ resource "aws_cloudwatch_metric_alarm" "alb_unhealthy" {
   evaluation_periods  = 2
 
   dimensions = {
-    TargetGroup  = aws_lb_target_group.app.arn_suffix  # ★arn ではなく arn_suffix
-    LoadBalancer = aws_lb.app.arn_suffix                # ★同上
+    TargetGroup  = aws_lb_target_group.app.arn_suffix # ★arn ではなく arn_suffix
+    LoadBalancer = aws_lb.app.arn_suffix              # ★同上
   }
 
   alarm_actions = [aws_sns_topic.alerts.arn]
@@ -37,13 +37,13 @@ resource "aws_cloudwatch_metric_alarm" "rds_low_storage" {
   metric_name         = "FreeStorageSpace"
   statistic           = "Average"
   comparison_operator = "LessThanThreshold"
-  threshold           = 2000000000   # 2GB(バイト)
+  threshold           = 2000000000 # 2GB(バイト)
   period              = 300
   evaluation_periods  = 1
   dimensions          = { DBInstanceIdentifier = aws_db_instance.main.identifier }
   alarm_actions       = [aws_sns_topic.alerts.arn]
   ok_actions          = [aws_sns_topic.alerts.arn]
-  treat_missing_data  = "notBreaching"   # ★RDS停止中はデータ欠損→誤発報させない
+  treat_missing_data  = "notBreaching" # ★RDS停止中はデータ欠損→誤発報させない
 }
 
 # RDS: CPU使用率が80%超
@@ -91,8 +91,8 @@ resource "aws_cloudwatch_dashboard" "main" {
           view   = "timeSeries",
           metrics = [
             ["AWS/ApplicationELB", "HealthyHostCount",
-             "TargetGroup", aws_lb_target_group.app.arn_suffix,
-             "LoadBalancer", aws_lb.app.arn_suffix]
+              "TargetGroup", aws_lb_target_group.app.arn_suffix,
+            "LoadBalancer", aws_lb.app.arn_suffix]
           ]
         }
       },
@@ -125,12 +125,12 @@ resource "aws_cloudwatch_dashboard" "main" {
 
 resource "aws_cloudwatch_log_group" "app" {
   name              = "/my-video-app/backend"
-  retention_in_days = 14   # ★無期限保持を避ける(課金&肥大対策)
+  retention_in_days = 14 # ★無期限保持を避ける(課金&肥大対策)
 }
 
 resource "aws_iam_role_policy" "ec2_logs" {
   name = "cloudwatch-logs-write"
-  role = "ec2-ssm-role"   # 既存ロールに名前で紐付け(本体はTF外のまま)
+  role = "ec2-ssm-role" # 既存ロールに名前で紐付け(本体はTF外のまま)
 
   policy = jsonencode({
     Version = "2012-10-17"

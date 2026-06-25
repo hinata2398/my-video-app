@@ -29,7 +29,7 @@ resource "aws_launch_template" "app" {
 
 resource "aws_autoscaling_group" "app" {
   name                = "my-video-app-asg"
-  vpc_zone_identifier = data.aws_subnets.default.ids # マルチAZ
+  vpc_zone_identifier = [aws_subnet.private_a.id, aws_subnet.private_c.id]
   target_group_arns   = [aws_lb_target_group.app.arn]
 
   min_size         = 2

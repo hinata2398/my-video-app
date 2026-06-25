@@ -9,3 +9,8 @@ variable "aws_profile" {
 }
 
 variable "alert_email" {}
+
+variable "db_password" {
+  type      = string
+  sensitive = true # plan/apply のログに出さない
+}

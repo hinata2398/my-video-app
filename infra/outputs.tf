@@ -1,9 +1,9 @@
-output "default_vpc_id" {
-  value = data.aws_vpc.default.id
+output "vpc_id" {
+  value = aws_vpc.main.id
 }
 
-output "default_subnet_ids" {
-  value = data.aws_subnets.default.ids
+output "private_subnet_ids" {
+  value = [aws_subnet.private_a.id, aws_subnet.private_c.id]
 }
 
 output "alb_dns_name" {
