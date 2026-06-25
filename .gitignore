@@ -36,3 +36,11 @@ Thumbs.db
 *.log
 npm-debug.log*
 .claude/
+
+# Terraform
+infra/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+crash.log
+crash.*.log
