@@ -1,13 +1,16 @@
 #!/bin/bash
 #dockerとgitをインストール
-dnf install -y docker git
+dnf install -y docker git amazon-efs-utils
 #dockerをシステムの起動時に自動で開始・実行
 systemctl enable --now docker
 #gitリポジトリのクローン
 git clone https://github.com/hinata2398/my-video-app.git
-cd my-video-app
+cd /my-video-app
 #dockerイメージの作成
 docker build -t mva-backend ./backend
+
+mkdir -p /mnt/efs/transcode-scratch
+mount -t efs -o tls fs-04c876346cf22461d:/ /mnt/efs/transcode-scratch
 
 #.envファイルの作成
 cat > app.env <<EOF
@@ -26,6 +29,7 @@ MEDIA_BASE_URL=https://d2acjx9xgv33qc.cloudfront.net
 EOF
 
 docker run -d --name backend -p 8080:8080 --env-file app.env \
+  -v /mnt/efs/transcode-scratch:/tmp/transcode \
   --log-driver=awslogs \
   --log-opt awslogs-region=ap-northeast-1 \
   --log-opt awslogs-group=/my-video-app/backend \
