@@ -31,7 +31,13 @@ type Comment = {
 };
 
 export default function VideoDetailPage() {
-  const { id } = useParams();
+  const [id, setId] = useState<string>("");
+
+  useEffect(() => {
+    // /videos/<id> の <id> を実URLから取得（_シェルでも本物の id が取れる）
+    const seg = window.location.pathname.split("/")[2];
+    if (seg) setId(seg);
+  }, []);
   const router = useRouter();
   const [video, setVideo] = useState<Video | null>(null);
   const [loading, setLoading] = useState(true);
@@ -46,6 +52,7 @@ export default function VideoDetailPage() {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchVideo = () => {
+    if (!id) return;
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos/${id}`)
       .then((res) => {
         if (!res.ok) {
@@ -66,6 +73,7 @@ export default function VideoDetailPage() {
     });
   };
   const fetchLikes = async () => {
+    if (!id) return;
     const [likeRes, dislikeRes] = await Promise.all([
       fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos/${id}/likes`),
       fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos/${id}/dislikes`),
@@ -91,6 +99,7 @@ export default function VideoDetailPage() {
   };
 
   const fetchBookmarkStatus = async () => {
+    if (!id) return;
     const token = localStorage.getItem("token");
     if (!token) return;
 
@@ -165,6 +174,7 @@ export default function VideoDetailPage() {
   };
 
   const fetchComments = async () => {
+    if (!id) return;
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL}/api/videos/${id}/comments`,
     );

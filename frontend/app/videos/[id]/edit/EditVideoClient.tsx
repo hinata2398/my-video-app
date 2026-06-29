@@ -4,7 +4,13 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 export default function EditVideoPage() {
-  const { id } = useParams();
+  const [id, setId] = useState<string>("");
+
+  useEffect(() => {
+    // /videos/<id> の <id> を実URLから取得（_シェルでも本物の id が取れる）
+    const seg = window.location.pathname.split("/")[2];
+    if (seg) setId(seg);
+  }, []);
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
