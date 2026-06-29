@@ -43,6 +43,11 @@ resource "aws_cloudfront_distribution" "frontend" {
       query_string = false         # クエリ文字列はS3に転送しない（キャッシュ効率UP）
       cookies { forward = "none" } # Cookieも転送しない
     }
+
+    function_association {
+      event_type   = "viewer-request" # リクエストが来た瞬間に書き換え
+      function_arn = aws_cloudfront_function.rewrite.arn
+    }
   }
 
   restrictions {
@@ -96,4 +101,12 @@ resource "aws_s3_bucket_policy" "frontend" {
       }
     ]
   })
+}
+
+resource "aws_cloudfront_function" "rewrite" {
+  name    = "hinata-movie-frontend-rewrite"
+  runtime = "cloudfront-js-2.0"
+  comment = "clean URL -> .html, dynamic /videos/<id> -> SPA shell"
+  publish = true # LIVE ステージへ即公開
+  code    = file("${path.module}/cf_rewrite.js")
 }
