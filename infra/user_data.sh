@@ -26,6 +26,7 @@ MINIO_REGION=ap-northeast-1
 MINIO_AUTO_CREATE_BUCKET=false
 MEDIA_DELIVERY=cloudfront
 MEDIA_BASE_URL=https://d2acjx9xgv33qc.cloudfront.net
+ALLOWED_ORIGINS=https://d2zu35d0ynqueu.cloudfront.net,http://localhost:3000
 EOF
 
 docker run -d --name backend -p 8080:8080 --env-file app.env \

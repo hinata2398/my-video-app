@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -66,7 +67,7 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
-	r.Use(corsMiddleware)
+	r.Use(corsMiddleware(allowedOrigins()))
 
 	r.Get("/api/health", handler.Health)
 	r.Post("/api/auth/register", authHandler.Register)
@@ -125,17 +126,42 @@ func main() {
 	}
 }
 
-func corsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
-			return
+// allowedOrigins は ALLOWED_ORIGINS（カンマ区切り）を集合にして返す。
+// 未設定ならローカル開発の http://localhost:3000 を既定にする。
+func allowedOrigins() map[string]bool {
+	raw := os.Getenv("ALLOWED_ORIGINS")
+	if raw == "" {
+		raw = "http://localhost:3000"
+	}
+	set := map[string]bool{}
+	for _, o := range strings.Split(raw, ",") {
+		if o = strings.TrimSpace(o); o != "" {
+			set[o] = true
 		}
-		next.ServeHTTP(w, r)
-	})
+	}
+	return set
+}
+
+// corsMiddleware は許可リストを受け取り、リクエストの Origin が一致したときだけ
+// その値をそのまま Access-Control-Allow-Origin に echo する。
+// ACAO は値を1つしか持てないため「リクエストの Origin を反射する」のが定石。
+func corsMiddleware(allowed map[string]bool) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if origin := r.Header.Get("Origin"); allowed[origin] {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				// Origin ごとに応答が変わるのでキャッシュに区別させる
+				w.Header().Add("Vary", "Origin")
+			}
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 func connectDB() *sql.DB {
