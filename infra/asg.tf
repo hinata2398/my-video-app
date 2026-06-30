@@ -25,6 +25,12 @@ resource "aws_launch_template" "app" {
     resource_type = "instance"
     tags          = { Name = "my-video-app-app" }
   }
+
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required" # IMDSv2 強制（セキュリティのベストプラクティス）
+    http_put_response_hop_limit = 2          # ★コンテナ(余分な1ホップ)から IMDS に届くように
+  }
 }
 
 resource "aws_autoscaling_group" "app" {

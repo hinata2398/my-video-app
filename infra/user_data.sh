@@ -27,6 +27,8 @@ MINIO_AUTO_CREATE_BUCKET=false
 MEDIA_DELIVERY=cloudfront
 MEDIA_BASE_URL=https://d2acjx9xgv33qc.cloudfront.net
 ALLOWED_ORIGINS=https://d2zu35d0ynqueu.cloudfront.net,http://localhost:3000
+TRANSCODE_QUEUE_URL=https://sqs.ap-northeast-1.amazonaws.com/104954589692/my-video-app-transcode
+AWS_REGION=ap-northeast-1
 EOF
 
 docker run -d --name backend -p 8080:8080 --env-file app.env \
