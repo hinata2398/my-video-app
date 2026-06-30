@@ -43,10 +43,11 @@ func (h *TranscodeHandler) Enqueue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.queue.Enqueue(queue.TranscodeJob{
-		VideoID:  videoID,
-		VideoKey: videoURL,
-	})
+	if err := h.queue.Enqueue(r.Context(), queue.TranscodeJob{VideoID: videoID,
+		VideoKey: videoURL}); err != nil {
+		http.Error(w, "キュー投入に失敗", http.StatusInternalServerError)
+		return
+	}
 
 	// ステータスをpendingに更新
 	h.db.ExecContext(r.Context(),

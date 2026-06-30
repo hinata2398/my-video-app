@@ -48,7 +48,10 @@ func main() {
 	videoHandler := handler.NewVideoHandler(videoUsecase, mediaResolver)
 	uploadHandler := handler.NewUploadHandler(minioClient)
 	thumbnailHandler := handler.NewThumbnailHandler(minioClient, db, mediaResolver)
-	transcodeQueue := queue.NewTranscodeQueue(minioClient, db, 2) // worker 2本
+	transcodeQueue, err := queue.NewTranscodeQueue(minioClient, db, os.Getenv("TRANSCODE_QUEUE_URL"))
+	if err != nil {
+		log.Fatal("transcode queue init failed: ", err)
+	}
 	transcodeHandler := handler.NewTranscodeHandler(transcodeQueue, db)
 	likeRepo := persistence.NewLikeRepository(db)
 	likeUsecase := usecase.NewLikeUsecase(likeRepo)

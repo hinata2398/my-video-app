@@ -3,10 +3,14 @@ package queue
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/hinata2398/my-video-app/backend/infrastructure/storage"
 )
 
@@ -16,35 +20,78 @@ type TranscodeJob struct {
 }
 
 type TranscodeQueue struct {
-	jobs  chan TranscodeJob
-	minio *storage.MinioClient
-	db    *sql.DB
+	sqs      *sqs.Client
+	queueURL string
+	minio    *storage.MinioClient
+	db       *sql.DB
 }
 
-func NewTranscodeQueue(minio *storage.MinioClient, db *sql.DB, workers int) *TranscodeQueue {
+func NewTranscodeQueue(minio *storage.MinioClient, db *sql.DB, queueURL string) (*TranscodeQueue, error) {
+	cfg, err := awsconfig.LoadDefaultConfig(context.Background())
+	if err != nil {
+		return nil, err
+	}
 	q := &TranscodeQueue{
-		jobs:  make(chan TranscodeJob, 100),
-		minio: minio,
-		db:    db,
+		sqs: sqs.NewFromConfig(cfg), queueURL: queueURL, minio: minio, db: db,
 	}
-	for i := 0; i < workers; i++ {
-		go q.worker(i)
-	}
-	return q
+	q.StartConsumer()
+	return q, nil
 }
 
-func (q *TranscodeQueue) Enqueue(job TranscodeJob) {
-	q.jobs <- job
+func (q *TranscodeQueue) Enqueue(ctx context.Context, job TranscodeJob) error {
+	body, err := json.Marshal(job)
+	if err != nil {
+		return err
+	}
+	_, err = q.sqs.SendMessage(ctx, &sqs.SendMessageInput{
+		QueueUrl:    aws.String(q.queueURL),
+		MessageBody: aws.String(string(body)),
+	})
+	return err
 }
 
-func (q *TranscodeQueue) worker(id int) {
-	log.Printf("transcode worker %d started", id)
-	for job := range q.jobs {
-		q.process(job)
+func (q *TranscodeQueue) StartConsumer() { go q.poll() }
+
+func (q *TranscodeQueue) poll() {
+	log.Println("transcode consumer started (SQS polling)")
+	for {
+		out, err := q.sqs.ReceiveMessage(context.Background(), &sqs.ReceiveMessageInput{
+			QueueUrl:            aws.String(q.queueURL),
+			MaxNumberOfMessages: 1,
+			WaitTimeSeconds:     20, // ロングポーリング
+		})
+		if err != nil {
+			log.Printf("sqs receive error: %v", err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
+		for _, m := range out.Messages {
+			var job TranscodeJob
+			if err := json.Unmarshal([]byte(*m.Body), &job); err != nil {
+				log.Printf("bad message, dropping: %v", err)
+				q.deleteMessage(m.ReceiptHandle) // 壊れたメッセージは捨てる
+				continue
+			}
+			if err := q.process(job); err != nil {
+				// 消さない → 可視性タイムアウト後に再配信 → 3回でDLQ
+				log.Printf("process failed (retry/DLQ): video_id=%d err=%v", job.VideoID, err)
+				continue
+			}
+			q.deleteMessage(m.ReceiptHandle) // 成功したら削除
+		}
 	}
 }
 
-func (q *TranscodeQueue) process(job TranscodeJob) {
+func (q *TranscodeQueue) deleteMessage(rh *string) {
+	_, err := q.sqs.DeleteMessage(context.Background(), &sqs.DeleteMessageInput{
+		QueueUrl: aws.String(q.queueURL), ReceiptHandle: rh,
+	})
+	if err != nil {
+		log.Printf("sqs delete error: %v", err)
+	}
+}
+
+func (q *TranscodeQueue) process(job TranscodeJob) error {
 	log.Printf("transcode start: video_id=%d", job.VideoID)
 	q.updateStatus(job.VideoID, "processing", "")
 
@@ -55,7 +102,7 @@ func (q *TranscodeQueue) process(job TranscodeJob) {
 	inputURL, err := q.minio.PresignedGetURL(ctx, job.VideoKey)
 	if err != nil {
 		q.updateStatus(job.VideoID, "error", err.Error())
-		return
+		return err
 	}
 
 	// 1. HLS変換（.m3u8 + .tsセグメント）
@@ -64,7 +111,7 @@ func (q *TranscodeQueue) process(job TranscodeJob) {
 	if err != nil {
 		log.Printf("HLS failed: video_id=%d, err=%v", job.VideoID, err)
 		q.updateStatus(job.VideoID, "error", err.Error())
-		return
+		return err
 	}
 
 	// video_url をHLSプレイリストのキーに更新
@@ -75,7 +122,7 @@ func (q *TranscodeQueue) process(job TranscodeJob) {
 	if err != nil {
 		log.Printf("db update failed: video_id=%d, err=%v", job.VideoID, err)
 		q.updateStatus(job.VideoID, "error", err.Error())
-		return
+		return err
 	}
 
 	// 2. サムネイル自動生成（thumbnail_urlが空の場合のみ）
@@ -92,6 +139,7 @@ func (q *TranscodeQueue) process(job TranscodeJob) {
 
 	q.updateStatus(job.VideoID, "done", "")
 	log.Printf("transcode done: video_id=%d hls=%s", job.VideoID, hlsKey)
+	return nil
 }
 
 func (q *TranscodeQueue) updateStatus(videoID int64, status, errMsg string) {
